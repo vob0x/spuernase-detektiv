@@ -4,8 +4,11 @@ const BASE = process.argv[2] || 'http://localhost:8099/';
 const ONLY = process.argv[3] ? Number(process.argv[3]) : null;
 
 (async () => {
-  const browser = await chromium.launch();
+  const proxy = process.env.HTTPS_PROXY || process.env.https_proxy;
+  const browser = await chromium.launch(proxy && !/localhost|127\.0\.0\.1/.test(BASE)
+    ? { proxy: { server: proxy }, args: ['--ignore-certificate-errors'] } : {});
   const ctx = await browser.newContext({
+    ignoreHTTPSErrors: true,
     ...devices['iPhone 13'],
     locale: 'de-CH',
     hasTouch: true, isMobile: true

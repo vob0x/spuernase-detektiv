@@ -5,7 +5,7 @@ const MIME = { '.html':'text/html;charset=utf-8', '.js':'text/javascript;charset
   '.png':'image/png', '.webp':'image/webp', '.svg':'image/svg+xml', '.jpg':'image/jpeg' };
 http.createServer((req,res)=>{
   let p = decodeURIComponent(req.url.split('?')[0]);
-  if (p === '/') p = '/index.html';
+  if (p.endsWith('/')) p += 'index.html';
   const f = path.join(root, p);
   if (!f.startsWith(path.resolve(root))) { res.writeHead(403); return res.end(); }
   fs.readFile(f, (e,d)=>{
