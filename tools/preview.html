@@ -1,0 +1,24 @@
+<!doctype html><meta charset="utf-8">
+<body style="margin:0;background:#1a2233;font-family:system-ui">
+<div id="w" style="display:grid;grid-template-columns:repeat(6,1fr);gap:14px;padding:16px"></div>
+<script type="module">
+import * as art from '../js/art.js';
+const items = [
+ ['Bogen', art.fingerabdruck('bogen')], ['Schleife', art.fingerabdruck('schleife')],
+ ['Wirbel', art.fingerabdruck('wirbel')], ['Doppel', art.fingerabdruck('doppel')],
+ ['Zickzack', art.sohle('zickzack')], ['Punkte', art.sohle('punkte')],
+ ['Wellen', art.sohle('wellen')], ['Raster', art.sohle('raster')],
+ ['Stollen', art.sohle('stollen')],
+ ['MTB', art.reifen('mountainbike')], ['Rennvelo', art.reifen('rennvelo')],
+ ['Trottinett', art.reifen('trottinett')], ['Kinderwagen', art.reifen('kinderwagen')],
+ ['Faser rot wellig', art.faser('#c0392b', true)], ['Faser blond', art.faser('#d9b45c', false)],
+ ['Schrift links', art.handschrift('links')], ['Schrift rechts', art.handschrift('rechts')],
+ ['Uhr 14:40', art.uhr(14,40)], ['Uhr 03:10', art.uhr(3,10)],
+ ['Lineal 24', art.lineal(24)],
+ ['Marker', art.clueMarker('schuh', 2)], ['Marker 2', art.clueMarker('fingerabdruck', 4)]
+];
+document.getElementById('w').innerHTML = items.map(([n,s])=>
+ `<div style="background:#0f1725;border:1px solid #33557c;border-radius:10px;padding:8px">
+   <div style="height:190px;display:grid;place-items:center">${s.replace('<svg','<svg style="max-height:180px;max-width:100%"')}</div>
+   <div style="color:#9db3cd;font-size:11px;text-align:center;margin-top:4px">${n}</div></div>`).join('');
+</script>

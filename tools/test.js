@@ -44,7 +44,7 @@ const ONLY = process.argv[3] ? Number(process.argv[3]) : null;
       if (luegen.length !== 1) probleme.push(luegen.length + ' Widersprüche statt 1');
       luegen.forEach(z => { if (!z.warum) probleme.push(z.name + ' ohne Begründung'); });
       // Szene auf einem 390px breiten Handy, 3:2 -> 390x260, Marker 64px
-      const W = 390, H = 260, M = 32;
+      const W = 390, H = 260, M = 36;
       f.spuren.forEach(s => {
         if (s.x * W < M || s.x * W > W - M || s.y * H < M || s.y * H > H - M)
           probleme.push('Spur ' + s.id + ' ragt aus der Szene');
@@ -53,7 +53,7 @@ const ONLY = process.argv[3] ? Number(process.argv[3]) : null;
         for (let j = i + 1; j < f.spuren.length; j++) {
           const a = f.spuren[i], b = f.spuren[j];
           const d = Math.hypot((a.x - b.x) * W, (a.y - b.y) * H);
-          if (d < 68) probleme.push('Spuren ' + a.id + '/' + b.id + ' ueberlappen (' + Math.round(d) + 'px)');
+          if (d < 78) probleme.push('Spuren ' + a.id + '/' + b.id + ' ueberlappen (' + Math.round(d) + 'px)');
         }
       out.push({ id: f.id, titel: f.titel, probleme });
     }
