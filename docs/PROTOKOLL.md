@@ -19,7 +19,8 @@ Datum: 26. August 2026
 | 10 | Bilder | Sechs Illustrationen mit Gemini erzeugt, über den Browser in den Container geholt, auf 900 px WebP reduziert. |
 | 11 | Spurenkoordinaten | Nach den Bildern neu gesetzt, automatische Prüfung auf Überlappung und Randabstand ergänzt. |
 | 12 | Politur | Toast nach oben (verdeckte den Hauptbutton), Spurentext unter die Szene, Faktenbox kompakter, Rösti-Hilfe zeigt beim zweiten Mal die Spur direkt. |
-| 13 | Deployment | Dateien über die GitHub-Weboberfläche hochgeladen, GitHub Pages aktiviert. |
+| 13 | Deployment | Dateien über die GitHub-Weboberfläche hochgeladen, GitHub Pages aktiviert. Live unter https://vob0x.github.io/spuernase-detektiv/ |
+| 14 | Abnahme der Live-Version | Alle Dateien 200 mit korrektem Content-Type, byteidentisch mit dem lokalen Stand, Testsuite auf dem ausgelieferten Stand unter dem echten Unterpfad grün, Installierbarkeit im Chrome bestätigt. |
 
 ## Entscheide und Begründungen
 
@@ -52,6 +53,20 @@ zeigt Rösti die Spur direkt – niemand bleibt stecken.
 **Öffentliches Repository.**
 GitHub Pages braucht für ein privates Repository ein kostenpflichtiges Konto.
 Das Spiel enthält keine persönlichen Daten, deshalb öffentlich.
+
+## Stolpersteine beim Deployment
+
+- Der Container-Token darf keine neuen Repositories anlegen und nicht in sie
+  pushen. Alles lief deshalb über die GitHub-Weboberfläche im Browser.
+- Klicks auf Formularknöpfe über Element-Referenzen lösten bei GitHub kein
+  Absenden aus; nur echte Koordinatenklicks funktionierten. Die erste
+  Upload-Runde wurde dadurch stillschweigend verworfen und musste wiederholt
+  werden. Kontrolle über die Commit-Liste im Repo ist hier Pflicht.
+- Nach jedem Dateiupload bleibt kurz ein nativer Dateidialog offen und blockiert
+  Klicks. Ein Escape davor löst es.
+- Der Ausgangs-Proxy lässt curl zu github.io durch, den Testbrowser aber nicht.
+  Die Live-Prüfung läuft deshalb über einen lokalen Spiegel der ausgelieferten
+  Dateien unter demselben Unterpfad.
 
 ## Offene Punkte
 

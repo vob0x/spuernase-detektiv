@@ -48,10 +48,29 @@ Automatisiert über `node tools/test.js` (Playwright, Chromium, Profil
 ✓ Alle Prüfungen bestanden
 ```
 
+## Prüfung der veröffentlichten Version
+
+Der Ausgangs-Proxy dieser Umgebung lässt Browser-Verkehr zu github.io nicht
+durch, wohl aber curl. Die Live-Version wurde deshalb so geprüft:
+
+1. Jede einzelne Datei über HTTPS abgerufen — alle 18 mit Status 200 und
+   korrektem Content-Type (`application/manifest+json` für das Manifest,
+   `image/webp`, `image/png`, `text/css`, `application/javascript`).
+2. Die ausgelieferten Dateien byteweise mit dem lokalen Stand verglichen —
+   keine Unterschiede.
+3. Genau diese heruntergeladenen Dateien unter dem gleichen Unterpfad
+   `/spuernase-detektiv/` lokal ausgeliefert und die komplette Testsuite
+   darauf laufen lassen: alle fünf Fälle 3 Sterne, Service Worker aktiv,
+   Offline-Reload erfolgreich. Damit ist auch bestätigt, dass die relativen
+   Pfade und der Service-Worker-Scope im Unterverzeichnis funktionieren.
+4. Zusätzlich im Chrome auf dem Mac geöffnet: Seite lädt, Chrome bietet
+   "Auf den Startbildschirm" an (die App wird also als installierbare PWA
+   erkannt), die Lupe reagiert auf echte Mauseingaben und sichert Spuren.
+
 ## Manuell zu prüfen (nicht automatisierbar)
 
 - Echtes Wischen mit dem Finger auf einem Telefon (der Test bewegt einen Zeiger)
-- `backdrop-filter` der Lupe: in Headless-Chromium ohne Wirkung, auf echten
-  Geräten sichtbar
+- `backdrop-filter` der Lupe: in Headless-Chromium ohne Wirkung, im echten
+  Chrome auf der Live-Version bestätigt sichtbar
 - Ton: WebAudio startet erst nach der ersten Berührung
 - Installation über "Zum Home-Bildschirm" auf iOS und Android
