@@ -17,12 +17,23 @@ Fünf Fälle, jeder in fünf Schritten:
 
 Rangaufstieg von Anwärter:in bis Chefinspektor:in, 1–3 Sterne pro Fall.
 
+## Bildsprache
+
+Akten auf einer Schreibtischplatte: dunkles Holz, darauf helle Papierflächen
+mit Aktenreitern. Tatorte sind Fotos mit Fotoecken, Laborproben sind
+Beweismittelkarten, Verdächtige sind Passfotos und bekommen beim Ausschluss
+einen roten Stempel quer über das Bild.
+
 ## Technik
 
 - Vanilla ES-Module, kein Framework, kein Build-Schritt
-- Grafik: KI-Illustrationen als Hintergrundplatten (WebP, ~470 KB gesamt) plus
-  prozedural erzeugtes SVG für alles Interaktive
-- Ton: vollständig synthetisiert über die WebAudio-API, keine Audiodateien
+- **Grafik:** KI-Illustrationen für Tatorte und 28 Figurenporträts (WebP, ~750 KB
+  gesamt); alles Beweiserhebliche – Fingerabdrücke, Sohlen, Reifenprofile,
+  Fasern, Handschriften, Uhr, Lineal – wird prozedural als SVG erzeugt, damit
+  Probe und richtige Antwort garantiert identisch aussehen
+- **Ton:** vollständig synthetisiert über die WebAudio-API, keine Audiodatei.
+  Drei Busse über gemeinsamen Hall und Kompressor, fünf ortsbezogene
+  Klangkulissen, optionale Titelmusik, elf Effekte
 - Offline: Service Worker mit vollständigem Precache
 - Fortschritt in `localStorage`, kein Konto, keine Datenübertragung, keine Werbung
 
@@ -35,10 +46,11 @@ sw.js                   Service Worker (Precache + Offline)
 css/app.css             gesamtes Styling
 js/app.js               Spiellogik und Bildschirme
 js/cases.js             die fünf Fallakten (reine Daten)
-js/art.js               SVG-Generatoren (Fingerabdrücke, Sohlen, Uhren, Gesichter)
-js/audio.js             WebAudio-Synthese
+js/art.js               SVG-Generatoren (Fingerabdrücke, Sohlen, Uhren, Marker)
+js/audio.js             Audio-Engine: Kulissen, Musik, Effekte
 js/state.js             Fortschritt, Ränge
-assets/img/             Hintergrundbilder der Tatorte
+assets/img/             Tatort-Illustrationen und Titelbild
+assets/portraits/       28 Figurenporträts
 assets/icons/           App-Icons
 tools/                  Entwicklungswerkzeuge (nicht Teil der App)
 docs/                   Konzept, Arbeitsprotokoll, Testbericht
@@ -49,7 +61,12 @@ docs/                   Konzept, Arbeitsprotokoll, Testbericht
 ```bash
 node tools/serve.js .        # http://localhost:8099
 node tools/test.js           # spielt alle fünf Fälle automatisch durch
+node tools/audiotest.js      # misst jeden Klang und prüft den Stummschalter
 ```
+
+`tools/preview.html` zeigt alle prozeduralen Beweismittel nebeneinander –
+praktisch, wenn man an `js/art.js` schraubt.
+`tools/portraits.py` schneidet einen 2x2-Porträtbogen in Einzelbilder.
 
 ## Einen Fall ändern oder hinzufügen
 

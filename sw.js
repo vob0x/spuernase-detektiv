@@ -1,6 +1,6 @@
 /* Service Worker – volles Precache, damit das Spiel offline läuft. */
 
-const VERSION = 'spuernase-v1';
+const VERSION = 'spuernase-v2';
 const ASSETS = [
   './',
   'index.html',
@@ -21,7 +21,35 @@ const ASSETS = [
   'assets/img/tatort-2.webp',
   'assets/img/tatort-3.webp',
   'assets/img/tatort-4.webp',
-  'assets/img/tatort-5.webp'
+  'assets/img/tatort-5.webp',
+  'assets/portraits/aaron.webp',
+  'assets/portraits/ammann.webp',
+  'assets/portraits/baertschi.webp',
+  'assets/portraits/beeler.webp',
+  'assets/portraits/bruennli.webp',
+  'assets/portraits/dario.webp',
+  'assets/portraits/egli.webp',
+  'assets/portraits/enia.webp',
+  'assets/portraits/frei.webp',
+  'assets/portraits/huebscher.webp',
+  'assets/portraits/jill.webp',
+  'assets/portraits/kevin.webp',
+  'assets/portraits/kunz.webp',
+  'assets/portraits/livia.webp',
+  'assets/portraits/luis.webp',
+  'assets/portraits/mira.webp',
+  'assets/portraits/nina.webp',
+  'assets/portraits/nora.webp',
+  'assets/portraits/odermatt.webp',
+  'assets/portraits/roesti-froh.webp',
+  'assets/portraits/roesti.webp',
+  'assets/portraits/ruben.webp',
+  'assets/portraits/rueegg.webp',
+  'assets/portraits/selina.webp',
+  'assets/portraits/steiner.webp',
+  'assets/portraits/sutter.webp',
+  'assets/portraits/timo.webp',
+  'assets/portraits/zaugg.webp'
 ];
 
 self.addEventListener('install', (e) => {
