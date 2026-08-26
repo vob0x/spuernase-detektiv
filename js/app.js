@@ -1,10 +1,10 @@
 /* Spürnase – Detektivbüro Bärenmoos
-   Spiellogik, Bildschirme, Eingabe. Vanilla ES-Module, kein Build-Schritt. */
+   Spiellogik und Bildschirme. Vanilla ES-Module, kein Build-Schritt. */
 
 import { FAELLE, RANG_TEXTE } from './cases.js';
 import * as art from './art.js';
 import * as S from './state.js';
-import { sfx, unlock, setSound, soundOn } from './audio.js';
+import { sfx, unlock, setSound, soundOn, setMusik, musikLaeuft, kulisse } from './audio.js';
 
 const app = document.getElementById('app');
 const toastEl = document.getElementById('toast');
@@ -12,15 +12,16 @@ const sheet = document.getElementById('sheet');
 const sheetTitle = document.getElementById('sheetTitle');
 const sheetBody = document.getElementById('sheetBody');
 
-const $ = (sel, root = document) => root.querySelector(sel);
-const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s).replace(/[&<>"]/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-/* ---------------- Laufende Ermittlung ---------------- */
+/* Szenenname der Fallakte auf eine Klangkulisse abbilden */
+const KLANG = { schule: 'schule', bahnhof: 'bahnhof', gemeindehaus: 'dorfplatz',
+                museum: 'museum', wald: 'wald' };
 
-let F = null;              // aktuelle Fallakte
-let E = null;              // Ermittlungsstand
+let F = null, E = null;
 
 function neueErmittlung(fall) {
   F = fall;
@@ -28,67 +29,29 @@ function neueErmittlung(fall) {
         ausschlussIdx: 0, raus: [], fehler: 0 };
 }
 
-/* ---------------- Rückmeldung ---------------- */
-
-let toastTimer = null;
-function toast(text, variante = '') {
-  toastEl.textContent = text;
-  toastEl.className = 'toast' + (variante ? ' toast--' + variante : '');
-  toastEl.hidden = false;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { toastEl.hidden = true; }, 2600);
-}
-
-function fehler(text) {
-  E.fehler++;
-  sfx.wrong();
-  toast(text, 'bad');
-  if (navigator.vibrate) navigator.vibrate(60);
-}
-
-/* ---------------- Notizbuch ---------------- */
-
-function oeffneNotizbuch() {
-  sfx.page();
-  sheetTitle.textContent = 'Notizbuch – ' + F.titel;
-  const teile = [];
-
-  teile.push(`<h3>Gesicherte Fakten</h3>`);
-  F.fakten.forEach(f => teile.push(
-    `<div class="fact">${esc(f)}</div>`));
-
-  teile.push(`<h3>Spuren (${E.gefunden.length}/${F.spuren.length})</h3>`);
-  if (!E.gefunden.length) teile.push(`<p class="muted small">Noch nichts gefunden.</p>`);
-  F.spuren.filter(s => E.gefunden.includes(s.id)).forEach(s => teile.push(
-    `<div class="note">${art.icon(s.icon)}<div><b>${esc(s.name)}</b>
-      <small>${esc(s.wert)}</small></div></div>`));
-
-  if (E.laborErg.length) {
-    teile.push(`<h3>Laborergebnisse</h3>`);
-    E.laborErg.forEach(r => teile.push(
-      `<div class="note">${art.icon('glas', '#4aa3ff')}<div><b>${esc(r)}</b></div></div>`));
-  }
-  if (E.raus.length) {
-    teile.push(`<h3>Ausgeschlossen</h3>`);
-    E.raus.forEach(id => {
-      const v = F.verdaechtige.find(x => x.id === id);
-      teile.push(`<div class="note">${art.icon('zettel', '#ff8080')}<div><b>${esc(v.name)}</b></div></div>`);
-    });
-  }
-  sheetBody.innerHTML = teile.join('');
-  sheet.hidden = false;
-}
-
-$$('[data-close-sheet]').forEach(el =>
-  el.addEventListener('click', () => { sheet.hidden = true; }));
-
 /* ---------------- Bausteine ---------------- */
+
+function portraet(key, cls = '') {
+  const p = `assets/portraits/${key}.webp`;
+  return `<span class="avatar ${cls}"><img src="${p}" alt=""
+    onerror="this.style.display='none'"></span>`;
+}
+
+function akte(reiter, inhalt) {
+  return `<div class="screen">
+    <div class="reiter">${reiter}</div>
+    <div class="akte">${inhalt}</div>
+  </div>`;
+}
+const lasche = (t, art = '') =>
+  `<span class="reiter__lasche ${art ? 'reiter__lasche--' + art : ''}">${esc(t)}</span>`;
 
 function topbar(titel, sub, opts = {}) {
   return `<div class="topbar">
     ${opts.zurueck ? `<button class="iconbtn" data-act="zurueck" aria-label="Zurück">‹</button>` : ''}
     <h1 class="topbar__title">${esc(titel)}${sub ? `<span class="topbar__sub">${esc(sub)}</span>` : ''}</h1>
-    ${opts.notiz ? `<button class="iconbtn" data-act="notiz" aria-label="Notizbuch">${art.icon('zettel','#ffd08a',22)}</button>` : ''}
+    ${opts.notiz ? `<button class="iconbtn" data-act="notiz" aria-label="Notizbuch">
+      ${art.icon('zettel', '#5d6473', 21)}</button>` : ''}
   </div>`;
 }
 
@@ -99,9 +62,8 @@ function fortschritt(stufe) {
   </div>`;
 }
 
-function sterneText(n) {
-  return `<span class="stars">${'★'.repeat(n)}<span class="stars--empty">${'★'.repeat(3 - n)}</span></span>`;
-}
+const sterneText = (n) =>
+  `<span class="stars">${'★'.repeat(n)}<span class="stars--leer">${'★'.repeat(3 - n)}</span></span>`;
 
 function bildFuer(spec) {
   if (!spec) return '';
@@ -116,90 +78,135 @@ function bildFuer(spec) {
   return '';
 }
 
-function avatar(p) {
-  return `<div class="avatar">${art.gesicht(p.seed, p.opts || {})}</div>`;
+function fotoblock(bild, szene, badge) {
+  return `<div class="fotorahmen"><div class="foto">
+    ${art.szeneFallback(szene)}
+    <img src="${bild}" alt="" onerror="this.remove()">
+    ${badge ? `<span class="foto__badge">${esc(badge)}</span>` : ''}
+  </div></div>`;
 }
 
-/* ================= BILDSCHIRM: START ================= */
+/* ---------------- Rückmeldung ---------------- */
+
+let toastTimer = null;
+function toast(text, variante = '') {
+  toastEl.textContent = text;
+  toastEl.className = 'toast' + (variante ? ' toast--' + variante : '');
+  toastEl.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toastEl.hidden = true; }, 2800);
+}
+
+function fehler(text) {
+  E.fehler++;
+  sfx.wrong();
+  toast(text, 'bad');
+  if (navigator.vibrate) navigator.vibrate(55);
+}
+
+/* ---------------- Notizbuch ---------------- */
+
+function oeffneNotizbuch() {
+  sfx.page();
+  sheetTitle.textContent = 'Notizbuch — ' + F.titel;
+  const t = [];
+  t.push(`<h3>Gesicherte Fakten</h3><div class="faktenbox">
+    ${F.fakten.map(f => `<div class="fakt">${esc(f)}</div>`).join('')}</div>`);
+  t.push(`<h3>Spuren ${E.gefunden.length} von ${F.spuren.length}</h3>`);
+  if (!E.gefunden.length) t.push(`<p class="muted small">Noch nichts gesichert.</p>`);
+  F.spuren.filter(s => E.gefunden.includes(s.id)).forEach(s => t.push(
+    `<div class="notiz">${art.icon(s.icon, '#9d6d18', 22)}<div><b>${esc(s.name)}</b>
+      <small>${esc(s.wert)}</small></div></div>`));
+  if (E.laborErg.length) {
+    t.push(`<h3>Ergebnisse</h3>`);
+    E.laborErg.forEach(r => t.push(
+      `<div class="notiz">${art.icon('glas', '#1f4f86', 22)}<div><b>${esc(r)}</b></div></div>`));
+  }
+  if (E.raus.length) {
+    t.push(`<h3>Ausgeschlossen</h3>`);
+    E.raus.forEach(id => {
+      const v = F.verdaechtige.find(x => x.id === id);
+      t.push(`<div class="notiz">${art.icon('stempel', '#b0341d', 22)}<div><b>${esc(v.name)}</b></div></div>`);
+    });
+  }
+  sheetBody.innerHTML = t.join('');
+  sheet.hidden = false;
+}
+$$('[data-close-sheet]').forEach(el => el.addEventListener('click', () => { sheet.hidden = true; }));
+
+/* ================= START ================= */
 
 function scrStart() {
   const r = S.rang(), naechst = S.naechsterRang(), ges = S.gesamtSterne();
-  app.innerHTML = `<div class="screen">
-    <div class="stack">
-      <div class="hero">
-        ${art.szeneFallback('schule')}
-        <img src="assets/img/hero.webp" alt="" onerror="this.remove()">
-        <div class="hero__badge">Detektivbüro Bärenmoos</div>
-      </div>
+  app.innerHTML = akte(
+    lasche('Bärenmoos') + lasche('Detektivbüro', 'blau'),
+    `<div class="stack">
+      ${fotoblock('assets/img/hero.webp', 'schule', 'Dein Schreibtisch')}
       <div>
         <h1 class="title">Spür<span>nase</span></h1>
         <p class="lead">Fünf Fälle. Echte Spuren. Und ein Hund, der bellt, wenn du zu weit weg suchst.</p>
       </div>
-      <div class="rankbar">
-        <div class="rankbar__medal">${r.medal}</div>
-        <div class="grow"><b>${esc(r.name)}</b>
-          <small>${ges} von 15 Sternen${naechst ? ` · noch ${naechst.min - ges} bis ${esc(naechst.name)}` : ' · Höchster Rang'}</small>
-        </div>
+      <div class="rangbalken">
+        <span class="rangbalken__medaille">${art.icon(r.icon, '#4a3208', 24)}</span>
+        <span class="grow"><b>${esc(r.name)}</b>
+          <small>${ges} von 15 Sternen${naechst ? ` · noch ${naechst.min - ges} bis ${esc(naechst.name)}` : ' · höchster Rang'}</small>
+        </span>
       </div>
       <button class="btn btn--wide" data-act="faelle">${ges ? 'Weiterermitteln' : 'Los geht’s'}</button>
       <div class="row">
-        <button class="btn btn--ghost grow" data-act="ton">${soundOn() ? '🔊 Ton an' : '🔇 Ton aus'}</button>
-        <button class="btn btn--ghost grow" data-act="anleitung">Anleitung</button>
+        <button class="btn btn--ghost grow" data-act="ton">${soundOn() ? 'Ton an' : 'Ton aus'}</button>
+        <button class="btn btn--ghost grow" data-act="musik">${musikLaeuft() ? 'Musik an' : 'Musik aus'}</button>
       </div>
-      ${ges ? `<button class="btn btn--ghost" data-act="reset">Fortschritt löschen</button>` : ''}
-      <p class="small muted center">Läuft offline. Dein Fortschritt bleibt nur auf diesem Gerät.</p>
-    </div>
-  </div>`;
+      <button class="btn btn--ghost btn--wide" data-act="anleitung">Wie ermittelt man?</button>
+      ${ges ? `<button class="btn btn--ghost btn--wide small" data-act="reset">Fortschritt löschen</button>` : ''}
+      <p class="small muted center">Läuft offline. Der Fortschritt bleibt nur auf diesem Gerät.</p>
+    </div>`);
 
   bind({
     faelle: () => go(scrFaelle),
-    ton: () => { const v = !soundOn(); setSound(v); S.setTon(v); sfx.tap(); scrStart(); },
-    anleitung: () => zeigeAnleitung(),
-    reset: () => {
-      if (confirm('Wirklich allen Fortschritt löschen?')) { S.reset(); scrStart(); }
-    }
+    ton: () => { const v = !soundOn(); setSound(v); S.setTon(v); if (v) { sfx.tap(); kulisse('buero'); } scrStart(); },
+    musik: () => { const v = !musikLaeuft(); setMusik(v); S.setMusikPref(v); scrStart(); },
+    anleitung: zeigeAnleitung,
+    reset: () => { if (confirm('Wirklich allen Fortschritt löschen?')) { S.reset(); scrStart(); } }
   });
 }
 
 function zeigeAnleitung() {
   sheetTitle.textContent = 'So ermittelst du';
-  sheetBody.innerHTML = `
-    <div class="note">${art.icon('glas')}<div><b>1. Tatort</b>
-      <small>Zieh den Finger über das Bild. Die Lupe leuchtet auf, wenn eine Spur in der Nähe ist. Halt kurz drauf – dann landet sie im Notizbuch.</small></div></div>
-    <div class="note">${art.icon('fingerabdruck')}<div><b>2. Labor</b>
-      <small>Vergleiche Muster, miss nach, lies die Uhr.</small></div></div>
-    <div class="note">${art.icon('zettel')}<div><b>3. Zeugen</b>
-      <small>Eine Aussage passt nicht zu den Fakten. Finde sie.</small></div></div>
-    <div class="note">${art.icon('knopf')}<div><b>4. Ausschluss</b>
-      <small>Streiche alle durch, die es nicht gewesen sein können.</small></div></div>
-    <div class="note">${art.icon('schuh')}<div><b>5. Verhaftung</b>
-      <small>Wer übrig bleibt, war es. Weniger Fehler = mehr Sterne.</small></div></div>
-    <p class="small muted">Das Notizbuch 📓 oben rechts zeigt dir jederzeit alles, was du schon weisst.</p>`;
+  const z = [
+    ['lupe', '1 · Tatort', 'Zieh den Finger über das Foto. Die Lupe leuchtet auf, wenn eine Spur in der Nähe ist. Halt kurz drauf – dann landet sie im Notizbuch.'],
+    ['fingerabdruck', '2 · Spurenlabor', 'Vergleiche Muster, miss nach, lies die Uhr.'],
+    ['zettel', '3 · Zeugen', 'Eine Aussage passt nicht zu den Fakten. Finde sie.'],
+    ['stempel', '4 · Ausschluss', 'Streiche alle durch, die es nicht gewesen sein können.'],
+    ['schuh', '5 · Verhaftung', 'Wer übrig bleibt, war es. Weniger Fehler = mehr Sterne.']
+  ];
+  sheetBody.innerHTML = z.map(([i, t, s]) =>
+    `<div class="notiz">${art.icon(i, '#9d6d18', 22)}<div><b>${t}</b><small>${s}</small></div></div>`).join('')
+    + `<p class="small muted">Das Notizbuch oben rechts zeigt dir jederzeit alles, was du schon weisst.</p>`;
   sheet.hidden = false;
 }
 
-/* ================= BILDSCHIRM: FALLLISTE ================= */
+/* ================= FALLLISTE ================= */
 
 function scrFaelle() {
   const items = FAELLE.map((f, i) => {
     const st = S.sterneFuer(f.id);
     const offen = i === 0 || S.geloest(FAELLE[i - 1].id);
-    return `<button class="caseitem" data-fall="${f.id}" ${offen ? '' : 'disabled'}>
-      <span class="caseitem__nr">${offen ? f.nr : '🔒'}</span>
+    return `<button class="caseitem ${st ? 'caseitem--fertig' : ''}" data-fall="${f.id}" ${offen ? '' : 'disabled'}>
+      <span class="caseitem__nr">${offen ? f.nr : '?'}</span>
       <span class="caseitem__txt">
         <b>${esc(f.titel)}</b>
         <small>${esc(f.ort)} · ${'●'.repeat(f.schwierigkeit)}${'○'.repeat(5 - f.schwierigkeit)}</small>
       </span>
-      ${offen ? sterneText(st) : ''}
+      ${offen ? sterneText(st) : `<span class="stars stars--leer">gesperrt</span>`}
     </button>`;
   }).join('');
 
-  app.innerHTML = `<div class="screen">
-    ${topbar('Fallakten', 'Wähle einen Fall', { zurueck: true })}
-    <div class="caselist">${items}</div>
-    <div class="spacer"></div>
-    <p class="small muted center">Ein Fall öffnet sich, sobald du den davor gelöst hast.</p>
-  </div>`;
+  app.innerHTML = akte(lasche('Fallakten') + lasche('Bärenmoos', 'blau'),
+    `${topbar('Fallakten', 'Wähle einen Fall', { zurueck: true })}
+     <div class="caselist">${items}</div>
+     <div class="grow"></div>
+     <p class="small muted center">Ein Fall öffnet sich, sobald du den davor gelöst hast.</p>`);
 
   bind({ zurueck: () => go(scrStart) });
   $$('[data-fall]').forEach(b => b.addEventListener('click', () => {
@@ -209,67 +216,63 @@ function scrFaelle() {
   }));
 }
 
-/* ================= BILDSCHIRM: BRIEFING ================= */
+/* ================= BRIEFING ================= */
 
 function scrBriefing() {
-  app.innerHTML = `<div class="screen">
-    ${topbar('Fall ' + F.nr, F.titel, { zurueck: true })}
-    <div class="stack">
-      <div class="hero">
-        ${art.szeneFallback(F.szene)}
-        <img src="${F.bild}" alt="" onerror="this.remove()">
-        <div class="hero__badge">${esc(F.ort)}</div>
-      </div>
-      ${F.briefing.map(t => `<div class="speech">
-        <div class="avatar">${art.polizist()}</div>
-        <div><b>Wachtmeister Brünnli</b><p class="small">${esc(t)}</p></div>
-      </div>`).join('')}
-      <div class="card card--flat">
-        <h3>Was wir sicher wissen</h3>
-        <div class="faktenbox">${F.fakten.map(f => `<div class="fact">${esc(f)}</div>`).join('')}</div>
-      </div>
-      <button class="btn btn--wide" data-act="start">Zum Tatort</button>
-    </div>
-  </div>`;
+  app.innerHTML = akte(
+    lasche('Akte ' + F.nr, 'rot') + lasche(F.ort),
+    `${topbar('Fall ' + F.nr, F.titel, { zurueck: true })}
+     <div class="stack">
+       ${fotoblock(F.bild, F.szene, F.ort)}
+       ${F.briefing.map((t, i) => `<div class="rede">
+         ${portraet('bruennli')}
+         <div>${i === 0 ? '<b>Wachtmeister Brünnli</b>' : ''}<p class="small">${esc(t)}</p></div>
+       </div>`).join('')}
+       <div class="rede">${portraet('roesti')}
+         <div><b>Rösti</b><p class="small">Wuff. (Er hilft dir am Tatort, wenn du nicht weiterkommst.)</p></div></div>
+       <div class="card card--flat">
+         <h3>Was wir sicher wissen</h3>
+         <div class="faktenbox">${F.fakten.map(f => `<div class="fakt">${esc(f)}</div>`).join('')}</div>
+       </div>
+       <button class="btn btn--wide" data-act="start">Zum Tatort</button>
+     </div>`);
   bind({ zurueck: () => go(scrFaelle), start: () => go(scrTatort) });
 }
 
-/* ================= BILDSCHIRM: TATORT (Lupe) ================= */
+/* ================= TATORT ================= */
 
 let tatortCleanup = null;
 
 function scrTatort() {
-  const marker = F.spuren.map(s => `
+  const marker = F.spuren.map((s, i) => `
     <button class="clue" data-clue="${s.id}"
       style="left:${s.x * 100}%; top:${s.y * 100}%"
-      aria-label="Spur untersuchen">${art.clueMarker(s.icon)}</button>`).join('');
+      aria-label="Spur ${i + 1} untersuchen">${art.clueMarker(s.icon, i + 1)}</button>`).join('');
 
-  app.innerHTML = `<div class="screen">
-    ${topbar('Tatort absuchen', F.ort, { zurueck: true, notiz: true })}
-    ${fortschritt(0)}
-    <div class="scene" id="scene">
-      ${art.szeneFallback(F.szene)}
-      <img class="scene__bg" src="${F.bild}" alt="" onerror="this.remove()">
-      <div class="scene__dark"></div>
-      ${marker}
-      <div class="scene__lens" id="lens" style="left:50%; top:50%"></div>
-      <div class="scene__hint" id="hint">Zieh den Finger über das Bild</div>
-    </div>
-    <div class="spacer"></div>
-    <div class="card">
-      <div class="row"><b class="grow small" id="spurZahl">0 von ${F.spuren.length} Spuren</b>
-        <button class="iconbtn iconbtn--label" data-act="hilfe">${art.icon('pfote','#ffd08a',20)}Rösti</button></div>
-      <p class="small muted" id="spurText">Fahre mit dem Finger über den Tatort. Die Lupe leuchtet auf, wenn eine Spur in der Nähe ist.</p>
-      <div class="evidence-row" id="evRow">${F.spuren.map(() =>
-        `<span class="evchip evchip--empty">?</span>`).join('')}</div>
-    </div>
-    <div class="grow"></div>
-    <button class="btn btn--wide" id="weiter" disabled>Erst alle Spuren sichern</button>
-  </div>`;
+  app.innerHTML = akte(
+    lasche('Akte ' + F.nr, 'rot') + lasche('Tatort'),
+    `${topbar('Tatort absuchen', F.ort, { zurueck: true, notiz: true })}
+     ${fortschritt(0)}
+     <div class="fotorahmen"><div class="scene" id="scene">
+       ${art.szeneFallback(F.szene)}
+       <img class="scene__bg" src="${F.bild}" alt="" onerror="this.remove()">
+       <div class="scene__dark"></div>
+       ${marker}
+       <div class="scene__lens" id="lens" style="left:50%; top:50%"></div>
+       <div class="scene__hint" id="hint">Zieh den Finger über das Foto</div>
+     </div></div>
+     <div class="card">
+       <div class="row"><b class="grow small" id="spurZahl">0 von ${F.spuren.length} Spuren</b>
+         <button class="iconbtn iconbtn--label" data-act="hilfe">${art.icon('pfote', '#5d6473', 19)}Rösti</button></div>
+       <p id="spurText">Fahre mit dem Finger über den Tatort. Die Lupe leuchtet auf, wenn eine Spur in der Nähe ist.</p>
+       <div class="evidence-row" id="evRow">${F.spuren.map(() =>
+         `<span class="evchip evchip--leer">?</span>`).join('')}</div>
+     </div>
+     <div class="grow"></div>
+     <button class="btn btn--wide" id="weiter" disabled>Erst alle Spuren sichern</button>`);
 
   const scene = $('#scene'), lens = $('#lens'), hint = $('#hint');
-  let lastMove = Date.now();
-  let hoverTimer = null, hoverId = null;
+  let lastMove = Date.now(), hoverTimer = null, hoverId = null, lupeTon = 0;
 
   function pos(ev) {
     const r = scene.getBoundingClientRect();
@@ -283,13 +286,12 @@ function scrTatort() {
     let naechste = null, minD = 1e9;
     F.spuren.forEach(s => {
       const el = scene.querySelector(`[data-clue="${s.id}"]`);
-      const cx = s.x * w, cy = s.y * h;
-      const d = Math.hypot(px - cx, py - cy);
+      const d = Math.hypot(px - s.x * w, py - s.y * h);
       if (E.gefunden.includes(s.id)) { el.classList.add('clue--found'); return; }
       if (d < minD) { minD = d; naechste = s; }
-      el.classList.toggle('clue--near', d < 78);
+      el.classList.toggle('clue--near', d < 80);
     });
-    if (naechste && minD < 42) {
+    if (naechste && minD < 44) {
       if (hoverId !== naechste.id) {
         hoverId = naechste.id;
         clearTimeout(hoverTimer);
@@ -304,6 +306,7 @@ function scrTatort() {
     hint.style.opacity = '0';
     const p = pos(ev);
     update(p.x, p.y, p.w, p.h);
+    if (Date.now() - lupeTon > 700) { lupeTon = Date.now(); sfx.lupe(); }
   }
 
   scene.addEventListener('pointermove', onMove, { passive: false });
@@ -319,32 +322,23 @@ function scrTatort() {
     const s = F.spuren.find(x => x.id === id);
     E.gefunden.push(id);
     sfx.found();
-    if (navigator.vibrate) navigator.vibrate(30);
+    if (navigator.vibrate) navigator.vibrate(28);
     scene.querySelector(`[data-clue="${id}"]`).classList.add('clue--found');
     $('#spurZahl').textContent = `${E.gefunden.length} von ${F.spuren.length} Spuren gesichert`;
     $('#evRow').innerHTML = F.spuren.map(sp => E.gefunden.includes(sp.id)
-      ? `<span class="evchip">${art.icon(sp.icon)}${esc(sp.name)}</span>`
-      : `<span class="evchip evchip--empty">?</span>`).join('');
+      ? `<span class="evchip">${art.icon(sp.icon, '#9d6d18', 17)}${esc(sp.name)}</span>`
+      : `<span class="evchip evchip--leer">?</span>`).join('');
     const st = $('#spurText');
-    if (st) { st.innerHTML = '<b>' + esc(s.name) + ':</b> ' + esc(s.text); st.classList.add('spurText--neu');
-      setTimeout(() => st.classList.remove('spurText--neu'), 900); }
+    if (st) st.innerHTML = `<b>${esc(s.name)}:</b> ${esc(s.text)}`;
 
     if (E.gefunden.length === F.spuren.length) {
       const w = $('#weiter');
       w.disabled = false;
       w.textContent = 'Ab ins Spurenlabor';
       sfx.right();
-      toast('Alle Spuren gesichert!', 'good');
+      toast('Alle Spuren gesichert!', 'gut');
     }
   }
-
-  const nudge = setInterval(() => {
-    if (Date.now() - lastMove < 18000) return;
-    lastMove = Date.now();
-    const offen = F.spuren.filter(s => !E.gefunden.includes(s.id));
-    if (!offen.length) return;
-    roestiHinweis(offen[0]);
-  }, 4000);
 
   let hilfen = 0;
   function roestiHinweis(s, direkt) {
@@ -352,27 +346,32 @@ function scrTatort() {
     const wo = (s.y > 0.6 ? 'unten' : s.y < 0.4 ? 'oben' : 'in der Mitte') + ' ' +
                (s.x > 0.62 ? 'rechts' : s.x < 0.38 ? 'links' : '');
     toast('Rösti bellt: Schau mal ' + wo.trim() + '!');
-    // Beim zweiten Mal zeigt Rösti die Spur direkt – niemand soll stecken bleiben.
     if (direkt) hilfen++;
-    if (hilfen >= 2 || !direkt && hilfen >= 2) {
+    if (hilfen >= 2) {
       const el = scene.querySelector(`[data-clue="${s.id}"]`);
       if (el) el.classList.add('clue--near');
     }
   }
 
+  const nudge = setInterval(() => {
+    if (Date.now() - lastMove < 18000) return;
+    lastMove = Date.now();
+    const offen = F.spuren.filter(s => !E.gefunden.includes(s.id));
+    if (offen.length) roestiHinweis(offen[0], false);
+  }, 4000);
+
   $('[data-act="hilfe"]').addEventListener('click', () => {
     const offen = F.spuren.filter(s => !E.gefunden.includes(s.id));
-    if (!offen.length) { toast('Du hast schon alles!', 'good'); return; }
+    if (!offen.length) { toast('Du hast schon alles!', 'gut'); return; }
     roestiHinweis(offen[0], true);
   });
 
   $('#weiter').addEventListener('click', () => { sfx.tap(); go(scrLabor); });
-
   bind({ zurueck: () => go(scrFaelle), notiz: oeffneNotizbuch });
   tatortCleanup = () => { clearInterval(nudge); clearTimeout(hoverTimer); };
 }
 
-/* ================= BILDSCHIRM: LABOR ================= */
+/* ================= LABOR ================= */
 
 function scrLabor() {
   const a = F.labor[E.laborIdx];
@@ -380,189 +379,196 @@ function scrLabor() {
 
   let mitte = '';
   if (a.typ === 'vergleich') {
-    mitte = `<div class="sample">
-        <div>${bildFuer(a.probe)}</div>
-        <div><b>${esc(a.probe.label)}</b><br><small class="muted">${esc(a.hilfe)}</small></div>
+    mitte = `<div class="probe">
+        <span class="probe__bild">${bildFuer(a.probe)}</span>
+        <span><b>${esc(a.probe.label)}</b><br><small class="muted">${esc(a.hilfe)}</small></span>
       </div>
       <div class="options">${a.optionen.map(o => `
-        <button class="opt" data-opt="${o.id}">${bildFuer(o)}<span>${esc(o.label)}</span></button>`).join('')}</div>`;
+        <button class="beweis" data-opt="${o.id}">
+          <span class="beweis__bild">${bildFuer(o)}</span>
+          <span class="beweis__label">${esc(o.label)}</span>
+        </button>`).join('')}</div>`;
   } else {
-    mitte = `${a.bild ? `<div class="card card--flat">${bildFuer(a.bild)}</div>` : ''}
+    mitte = `${a.bild ? `<div class="card card--flat" style="display:grid;place-items:center">${bildFuer(a.bild)}</div>` : ''}
       ${a.tabelle ? `<div class="card card--flat"><h3>Umrechnungstabelle</h3>
-        ${a.tabelle.map(([l, g]) => `<div class="row"><span class="grow">${esc(l)}</span><b>${esc(g)}</b></div>`).join('')}
-      </div>` : ''}
-      <p class="small muted">${esc(a.hilfe || '')}</p>
+        <div class="tabelle">${a.tabelle.map(([l, g]) =>
+          `<div><span>${esc(l)}</span><b>${esc(g)}</b></div>`).join('')}</div></div>` : ''}
+      ${a.hilfe ? `<p class="small muted">${esc(a.hilfe)}</p>` : ''}
       <div class="options options--1">${a.optionen.map(o => `
-        <button class="opt" data-opt="${o.id}"><span>${esc(o.label)}</span></button>`).join('')}</div>`;
+        <button class="opt" data-opt="${o.id}">${esc(o.label)}</button>`).join('')}</div>`;
   }
 
-  app.innerHTML = `<div class="screen">
-    ${topbar('Spurenlabor', `Aufgabe ${E.laborIdx + 1} von ${F.labor.length}`, { zurueck: true, notiz: true })}
-    ${fortschritt(1)}
-    <div class="stack">
-      <div class="card"><h2>${esc(a.frage)}</h2></div>
-      ${mitte}
-    </div>
-  </div>`;
+  app.innerHTML = akte(
+    lasche('Akte ' + F.nr, 'rot') + lasche('Labor'),
+    `${topbar('Spurenlabor', `Aufgabe ${E.laborIdx + 1} von ${F.labor.length}`, { zurueck: true, notiz: true })}
+     ${fortschritt(1)}
+     <div class="stack">
+       <div class="card"><h2>${esc(a.frage)}</h2></div>
+       ${mitte}
+     </div>`);
 
   $$('[data-opt]').forEach(b => b.addEventListener('click', () => {
-    if (b.dataset.opt === a.richtig) {
-      b.classList.add('opt--right');
+    const richtig = b.dataset.opt === a.richtig;
+    const kl = b.classList.contains('beweis') ? 'beweis' : 'opt';
+    if (richtig) {
+      b.classList.add(kl + '--richtig');
       sfx.right();
       E.laborErg.push(a.ergebnis);
-      toast(a.ergebnis, 'good');
+      toast(a.ergebnis, 'gut');
       $$('[data-opt]').forEach(x => x.style.pointerEvents = 'none');
-      setTimeout(() => { E.laborIdx++; go(scrLabor); }, 1500);
+      setTimeout(() => { E.laborIdx++; go(scrLabor); }, 1600);
     } else {
-      b.classList.add('opt--wrong');
+      b.classList.add(kl + '--falsch');
       fehler('Das passt nicht. Schau nochmal genau hin.');
-      setTimeout(() => b.classList.remove('opt--wrong'), 900);
+      setTimeout(() => b.classList.remove(kl + '--falsch'), 900);
     }
   }));
 
   bind({ zurueck: () => go(scrTatort), notiz: oeffneNotizbuch });
 }
 
-/* ================= BILDSCHIRM: ZEUGEN ================= */
+/* ================= ZEUGEN ================= */
 
 function scrZeugen() {
-  app.innerHTML = `<div class="screen">
-    ${topbar('Zeugen befragen', 'Eine Aussage kann nicht stimmen', { zurueck: true, notiz: true })}
-    ${fortschritt(2)}
-    <div class="stack">
-      <div class="card card--flat">
-        <h3>Vergleiche mit den Fakten</h3>
-        <div class="faktenbox">
-          ${F.fakten.map(f => `<div class="fact">${esc(f)}</div>`).join('')}
-          ${E.laborErg.map(f => `<div class="fact">${esc(f)}</div>`).join('')}
-        </div>
-      </div>
-      ${F.zeugen.map((z, zi) => `<div class="witness">
-        ${avatar(z)}
-        <div class="bubbles">
-          <div><b>${esc(z.name)}</b> <small class="muted">${esc(z.rolle)}</small></div>
-          ${z.aussagen.map((s, si) =>
-            `<button class="bubble" data-z="${zi}" data-s="${si}">${esc(s)}</button>`).join('')}
-        </div>
-      </div>`).join('')}
-    </div>
-  </div>`;
+  app.innerHTML = akte(
+    lasche('Akte ' + F.nr, 'rot') + lasche('Zeugen', 'blau'),
+    `${topbar('Zeugen befragen', 'Eine Aussage kann nicht stimmen', { zurueck: true, notiz: true })}
+     ${fortschritt(2)}
+     <div class="stack">
+       <div class="card card--flat">
+         <h3>Vergleiche mit den Fakten</h3>
+         <div class="faktenbox">
+           ${F.fakten.map(f => `<div class="fakt">${esc(f)}</div>`).join('')}
+           ${E.laborErg.map(f => `<div class="fakt">${esc(f)}</div>`).join('')}
+         </div>
+       </div>
+       ${F.zeugen.map((z, zi) => `<div class="zeuge">
+         ${portraet(z.bild)}
+         <div class="bubbles">
+           <div><b>${esc(z.name)}</b> <small class="muted">${esc(z.rolle)}</small></div>
+           ${z.aussagen.map((s, si) =>
+             `<button class="bubble" data-z="${zi}" data-s="${si}">${esc(s)}</button>`).join('')}
+         </div>
+       </div>`).join('')}
+     </div>`);
 
   $$('.bubble').forEach(b => b.addEventListener('click', () => {
     const z = F.zeugen[+b.dataset.z], si = +b.dataset.s;
     if (z.luege === si) {
-      b.classList.add('bubble--right');
+      b.classList.add('bubble--richtig');
       sfx.right();
-      $$('.bubble').forEach(x => x.classList.add('bubble--off'));
+      $$('.bubble').forEach(x => { if (x !== b) x.classList.add('bubble--aus'); });
       E.zeugeGeloest = true;
       E.laborErg.push('Widerspruch bei ' + z.name + ': ' + z.warum);
       const wrap = document.createElement('div');
       wrap.className = 'stack';
-      wrap.innerHTML = `<div class="card"><h3>Erwischt!</h3><p>${esc(z.warum)}</p></div>
+      wrap.innerHTML = `<div class="card"><div class="row"><span class="stempel">Erwischt</span></div>
+        <p style="margin-top:8px">${esc(z.warum)}</p></div>
         <button class="btn btn--wide" id="weiterZ">Verdächtige ausschliessen</button>`;
-      $('.screen .stack').appendChild(wrap);
-      $('#weiterZ').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      $('.akte .stack').appendChild(wrap);
       $('#weiterZ').addEventListener('click', () => { sfx.tap(); go(scrAusschluss); });
+      $('#weiterZ').scrollIntoView({ behavior: 'smooth', block: 'center' });
     } else {
-      b.classList.add('bubble--wrong');
+      b.classList.add('bubble--falsch');
       fehler('Diese Aussage passt zu den Fakten. Lies weiter.');
-      setTimeout(() => b.classList.remove('bubble--wrong'), 1000);
+      setTimeout(() => b.classList.remove('bubble--falsch'), 1000);
     }
   }));
 
   bind({ zurueck: () => go(scrTatort), notiz: oeffneNotizbuch });
 }
 
-/* ================= BILDSCHIRM: AUSSCHLUSS ================= */
+/* ================= AUSSCHLUSS ================= */
+
+function verdaechtigenKarte(v, extra = '') {
+  return `<button class="suspect ${E.raus.includes(v.id) ? 'suspect--raus' : ''}" data-v="${v.id}">
+    <span class="suspect__pic"><img src="assets/portraits/${v.bild}.webp" alt=""
+      onerror="this.style.display='none'"></span>
+    <b>${esc(v.name)}</b>
+    ${extra}
+  </button>`;
+}
 
 function scrAusschluss() {
   const step = F.ausschluss[E.ausschlussIdx];
   if (!step) { go(scrVerhaftung); return; }
   const noch = step.raus.filter(id => !E.raus.includes(id));
 
-  app.innerHTML = `<div class="screen">
-    ${topbar('Ausschlussverfahren', `Schritt ${E.ausschlussIdx + 1} von ${F.ausschluss.length}`, { zurueck: true, notiz: true })}
-    ${fortschritt(3)}
-    <div class="stack">
-      <div class="card"><h2>${esc(step.frage)}</h2>
-        <p class="small muted">${esc(step.hinweis)}</p></div>
-      <div class="suspects">${F.verdaechtige.map(v => `
-        <button class="suspect ${E.raus.includes(v.id) ? 'suspect--out' : ''}" data-v="${v.id}">
-          <span class="suspect__pic">${art.gesicht(v.seed, v.opts || {})}</span>
-          <b>${esc(v.name)}</b>
-          <span class="tags">${v.merkmale.map(m => `<span class="tag">${esc(m)}</span>`).join('')}</span>
-        </button>`).join('')}</div>
-      <p class="small muted center" id="rest">Noch ${noch.length} ausschliessen</p>
-    </div>
-  </div>`;
+  app.innerHTML = akte(
+    lasche('Akte ' + F.nr, 'rot') + lasche('Ausschluss'),
+    `${topbar('Ausschlussverfahren', `Schritt ${E.ausschlussIdx + 1} von ${F.ausschluss.length}`, { zurueck: true, notiz: true })}
+     ${fortschritt(3)}
+     <div class="stack">
+       <div class="card"><h2>${esc(step.frage)}</h2>
+         <p class="small muted">${esc(step.hinweis)}</p></div>
+       <div class="suspects">${F.verdaechtige.map(v => verdaechtigenKarte(v,
+         `<span class="tags">${v.merkmale.map(m => `<span class="tag">${esc(m)}</span>`).join('')}</span>`)).join('')}</div>
+       <p class="small muted center" id="rest">Noch ${noch.length} ausschliessen</p>
+     </div>`);
 
   $$('[data-v]').forEach(b => b.addEventListener('click', () => {
     const id = b.dataset.v;
-    if (E.raus.includes(id)) { toast('Die/der ist schon draussen.'); return; }
+    if (E.raus.includes(id)) { toast('Die oder der ist schon draussen.'); return; }
     if (step.raus.includes(id)) {
       E.raus.push(id);
-      b.classList.add('suspect--out');
-      sfx.stamp();
+      b.classList.add('suspect--raus');
+      sfx.stempel();
+      if (navigator.vibrate) navigator.vibrate(35);
       const offen = step.raus.filter(x => !E.raus.includes(x));
       $('#rest').textContent = offen.length ? `Noch ${offen.length} ausschliessen` : 'Richtig!';
       if (!offen.length) {
         sfx.right();
         const wrap = document.createElement('div');
-        wrap.innerHTML = `<div class="card"><h3>Genau</h3><p>${esc(step.warum)}</p></div>
+        wrap.innerHTML = `<div class="card"><div class="row"><span class="stempel stempel--gut">Genau</span></div>
+          <p style="margin-top:8px">${esc(step.warum)}</p></div>
           <div class="spacer"></div>
           <button class="btn btn--wide" id="weiterA">Weiter</button>`;
-        $('.screen .stack').appendChild(wrap);
-        $('#weiterA').addEventListener('click', () => {
-          sfx.tap(); E.ausschlussIdx++; go(scrAusschluss);
-        });
+        $('.akte .stack').appendChild(wrap);
+        $('#weiterA').addEventListener('click', () => { sfx.tap(); E.ausschlussIdx++; go(scrAusschluss); });
         $('#weiterA').scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     } else {
-      b.classList.add('opt--wrong');
+      b.classList.add('suspect--falsch');
       fehler('Nein – diese Person passt zur Spur.');
-      setTimeout(() => b.classList.remove('opt--wrong'), 900);
+      setTimeout(() => b.classList.remove('suspect--falsch'), 900);
     }
   }));
 
   bind({ zurueck: () => go(scrZeugen), notiz: oeffneNotizbuch });
 }
 
-/* ================= BILDSCHIRM: VERHAFTUNG ================= */
+/* ================= VERHAFTUNG ================= */
 
 function scrVerhaftung() {
-  app.innerHTML = `<div class="screen">
-    ${topbar('Wer war es?', 'Tippe die Person an', { zurueck: true, notiz: true })}
-    ${fortschritt(4)}
-    <div class="stack">
-      <div class="card"><h2>Deine Ermittlung ist fertig.</h2>
-        <p class="small muted">Alle Durchgestrichenen kommen nicht in Frage. Wer bleibt übrig?</p></div>
-      <div class="suspects">${F.verdaechtige.map(v => `
-        <button class="suspect ${E.raus.includes(v.id) ? 'suspect--out' : ''}" data-v="${v.id}">
-          <span class="suspect__pic">${art.gesicht(v.seed, v.opts || {})}</span>
-          <b>${esc(v.name)}</b>
-        </button>`).join('')}</div>
-    </div>
-  </div>`;
+  app.innerHTML = akte(
+    lasche('Akte ' + F.nr, 'rot') + lasche('Verhaftung'),
+    `${topbar('Wer war es?', 'Tippe die Person an', { zurueck: true, notiz: true })}
+     ${fortschritt(4)}
+     <div class="stack">
+       <div class="card"><h2>Deine Ermittlung ist fertig.</h2>
+         <p class="small muted">Alle Gestempelten kommen nicht in Frage. Wer bleibt übrig?</p></div>
+       <div class="suspects">${F.verdaechtige.map(v => verdaechtigenKarte(v)).join('')}</div>
+     </div>`);
 
   $$('[data-v]').forEach(b => b.addEventListener('click', () => {
     const id = b.dataset.v;
     if (id !== F.taeter) {
-      b.classList.add('opt--wrong');
+      b.classList.add('suspect--falsch');
       fehler(E.raus.includes(id)
         ? 'Diese Person hast du selbst ausgeschlossen.'
         : 'Die Spuren zeigen auf jemand anderen.');
-      setTimeout(() => b.classList.remove('opt--wrong'), 900);
+      setTimeout(() => b.classList.remove('suspect--falsch'), 900);
       return;
     }
-    b.classList.add('suspect--right');
-    sfx.siren();
-    setTimeout(() => go(scrErgebnis), 900);
+    b.classList.add('suspect--taeter');
+    sfx.sirene();
+    setTimeout(() => go(scrErgebnis), 1100);
   }));
 
   bind({ zurueck: () => go(scrAusschluss), notiz: oeffneNotizbuch });
 }
 
-/* ================= BILDSCHIRM: ERGEBNIS ================= */
+/* ================= ERGEBNIS ================= */
 
 function scrErgebnis() {
   const st = E.fehler <= 1 ? 3 : E.fehler <= 4 ? 2 : 1;
@@ -574,34 +580,35 @@ function scrErgebnis() {
   const naechster = FAELLE[FAELLE.findIndex(f => f.id === F.id) + 1];
 
   sfx.win();
-  if (aufgestiegen) setTimeout(() => sfx.rank(), 900);
+  if (aufgestiegen) setTimeout(() => sfx.rang(), 1000);
 
-  app.innerHTML = `<div class="screen">
-    ${topbar('Fall gelöst', F.titel)}
-    <div class="stack center">
-      <div class="bigstars">${'★'.repeat(st)}<span class="stars--empty">${'★'.repeat(3 - st)}</span></div>
-      <p class="small muted">${E.fehler === 0 ? 'Kein einziger Fehler. Sauber.' : `${E.fehler} Fehlversuch${E.fehler > 1 ? 'e' : ''}`}</p>
-      <div class="card">
-        <div class="row"><div class="avatar">${art.gesicht(taeter.seed, taeter.opts || {})}</div>
-          <div style="text-align:left"><small class="muted">Überführt</small><br><b>${esc(taeter.name)}</b></div></div>
-      </div>
-      <div class="card" style="text-align:left">
-        ${F.aufloesung.map(t => `<p>${esc(t)}</p>`).join('')}
-      </div>
-      <div class="didyouknow" style="text-align:left">
-        <b>Wusstest du? ${esc(F.wusstest.titel)}</b>
-        <p class="small" style="margin-top:6px">${esc(F.wusstest.text)}</p>
-      </div>
-      ${aufgestiegen ? `<div class="rankbar"><div class="rankbar__medal">${neuerRang.medal}</div>
-        <div class="grow" style="text-align:left"><b>Befördert: ${esc(neuerRang.name)}</b>
-        <small>${esc(RANG_TEXTE[neuerRang.name] || '')}</small></div></div>` : ''}
-      ${naechster
-        ? `<button class="btn btn--wide" data-act="next">Nächster Fall: ${esc(naechster.titel)}</button>`
-        : `<div class="card"><b>Alle fünf Fälle gelöst.</b>
-             <p class="small muted">Bärenmoos kann ruhig schlafen. Du kannst jeden Fall nochmals spielen und deine Sterne verbessern.</p></div>`}
-      <button class="btn btn--ghost btn--wide" data-act="liste">Zu den Fallakten</button>
-    </div>
-  </div>`;
+  app.innerHTML = akte(
+    lasche('Akte ' + F.nr + ' geschlossen', 'blau'),
+    `${topbar('Fall gelöst', F.titel)}
+     <div class="stack center">
+       <div><span class="stempel stempel--gut">Fall abgeschlossen</span></div>
+       <div class="bigstars">${'★'.repeat(st)}<span class="stars--leer">${'★'.repeat(3 - st)}</span></div>
+       <p class="small muted">${E.fehler === 0 ? 'Kein einziger Fehler. Sauber.'
+          : `${E.fehler} Fehlversuch${E.fehler > 1 ? 'e' : ''}`}</p>
+       <div class="card">
+         <div class="row">${portraet(taeter.bild, 'avatar--gross')}
+           <span style="text-align:left"><small class="muted">Überführt</small><br><b>${esc(taeter.name)}</b></span></div>
+       </div>
+       <div class="card" style="text-align:left">${F.aufloesung.map(t => `<p>${esc(t)}</p>`).join('')}</div>
+       <div class="wusstest" style="text-align:left">
+         <b>Wusstest du? ${esc(F.wusstest.titel)}</b>
+         <p class="small" style="margin-top:6px">${esc(F.wusstest.text)}</p>
+       </div>
+       ${aufgestiegen ? `<div class="rangbalken">
+         <span class="rangbalken__medaille">${art.icon(neuerRang.icon, '#4a3208', 24)}</span>
+         <span class="grow" style="text-align:left"><b>Befördert: ${esc(neuerRang.name)}</b>
+         <small>${esc(RANG_TEXTE[neuerRang.name] || '')}</small></span></div>` : ''}
+       ${naechster
+         ? `<button class="btn btn--wide" data-act="next">Nächster Fall: ${esc(naechster.titel)}</button>`
+         : `<div class="card"><b>Alle fünf Fälle gelöst.</b>
+              <p class="small muted">Bärenmoos kann ruhig schlafen. Du kannst jeden Fall nochmals spielen und deine Sterne verbessern.</p></div>`}
+       <button class="btn btn--ghost btn--wide" data-act="liste">Zu den Fallakten</button>
+     </div>`);
 
   bind({
     next: () => { neueErmittlung(naechster); go(scrBriefing); },
@@ -611,11 +618,14 @@ function scrErgebnis() {
 
 /* ---------------- Router ---------------- */
 
+const IM_FALL = new Set([scrBriefing, scrTatort, scrLabor, scrZeugen, scrAusschluss, scrVerhaftung]);
+
 function go(fn) {
   if (tatortCleanup) { tatortCleanup(); tatortCleanup = null; }
   sheet.hidden = true;
   window.scrollTo(0, 0);
   fn();
+  kulisse(IM_FALL.has(fn) && F ? (KLANG[F.szene] || 'buero') : 'buero');
 }
 
 function bind(map) {
@@ -630,17 +640,17 @@ function bind(map) {
 
 S.load();
 setSound(S.get().ton);
-document.addEventListener('pointerdown', unlock, { once: true });
+document.addEventListener('pointerdown', () => {
+  unlock();
+  if (S.get().musik) setMusik(true);
+  kulisse('buero');
+}, { once: true });
 scrStart();
 
-/* Service Worker */
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
-  });
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 }
 
-/* Installations-Hinweis */
 let installEvt = null;
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
@@ -648,8 +658,8 @@ window.addEventListener('beforeinstallprompt', (e) => {
   const b = document.createElement('button');
   b.className = 'btn btn--ghost';
   b.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 14px);z-index:80';
-  b.textContent = '📲 Auf den Startbildschirm';
-  b.onclick = async () => { b.remove(); installEvt.prompt(); installEvt = null; };
+  b.textContent = 'Auf den Startbildschirm';
+  b.onclick = () => { b.remove(); installEvt.prompt(); installEvt = null; };
   document.body.appendChild(b);
   setTimeout(() => b.remove(), 12000);
 });

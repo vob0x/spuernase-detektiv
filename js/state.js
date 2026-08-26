@@ -3,14 +3,14 @@
 const KEY = 'spuernase.v1';
 
 const RAENGE = [
-  { min: 0,  name: 'Anwärter:in',     medal: '🔰' },
-  { min: 2,  name: 'Spürnase',        medal: '🐕' },
-  { min: 5,  name: 'Wachtmeister:in', medal: '🎖️' },
-  { min: 9,  name: 'Inspektor:in',    medal: '🏅' },
-  { min: 13, name: 'Chefinspektor:in', medal: '👑' }
+  { min: 0,  name: 'Anwärter:in',      icon: 'lupe' },
+  { min: 2,  name: 'Spürnase',         icon: 'pfote' },
+  { min: 5,  name: 'Wachtmeister:in',  icon: 'zettel' },
+  { min: 9,  name: 'Inspektor:in',     icon: 'fingerabdruck' },
+  { min: 13, name: 'Chefinspektor:in', icon: 'stempel' }
 ];
 
-const leer = () => ({ sterne: {}, ton: true, gesehen: false });
+const leer = () => ({ sterne: {}, ton: true, musik: false, gesehen: false });
 
 let data = leer();
 
@@ -54,6 +54,7 @@ export function naechsterRang() {
 }
 
 export function setTon(v) { data.ton = !!v; save(); }
+export function setMusikPref(v) { data.musik = !!v; save(); }
 export function setGesehen() { data.gesehen = true; save(); }
 
 export function reset() { data = leer(); save(); }
