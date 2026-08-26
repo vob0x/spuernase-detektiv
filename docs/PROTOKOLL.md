@@ -54,6 +54,35 @@ zeigt Rösti die Spur direkt – niemand bleibt stecken.
 GitHub Pages braucht für ein privates Repository ein kostenpflichtiges Konto.
 Das Spiel enthält keine persönlichen Daten, deshalb öffentlich.
 
+## Zweite Runde: Artwork und Ton (gleicher Tag)
+
+Rückmeldung: «Das Artwork ist teilweise noch rudimentär.» Zutreffend – die
+Figuren waren prozedurale Vektorgesichter und die Oberfläche generisches
+Dunkelblau. Gewählte Richtung nach Rückfrage: Akten auf einer Schreibtischplatte,
+alle 27 Figuren als Illustration.
+
+| # | Schritt | Ergebnis |
+|---|---|---|
+| 15 | Figuren | Sieben 2x2-Bögen mit Gemini erzeugt, mit `tools/portraits.py` an den weissen Trennlinien automatisch geschnitten, 28 Porträts à ~10 KB. Haarfarben gegen die Falllogik geprüft (Fall 1 hängt daran). |
+| 16 | Beweismittel neu gezeichnet | Fingerabdrücke folgen jetzt einem Strömungsfeld statt konzentrischen Kreisen; Sohlen und Reifen als Abdruck im Staub; Fasern unter dem Mikroskop mit Vignette und Massstab; Uhr als Schweizer Bahnhofsuhr. |
+| 17 | Oberfläche | Vollständig auf Aktenmappe umgebaut: Holzgrund, Papierflächen, Aktenreiter, Fotoecken, Beweismittelkarten, Stempel «Ausgeschlossen» statt durchgestrichener Kacheln, nummerierte Sucherrahmen als Spurenmarker. |
+| 18 | Audio-Engine | Neu aufgebaut: drei Busse über Hall und Kompressor, fünf ortsbezogene Klangkulissen, Detektiv-Titelmusik, elf überarbeitete Effekte. Alles synthetisiert. |
+| 19 | Spurenkoordinaten | Marker sind von 64 auf 72 px gewachsen. Ein Entzerrungslauf hat alle Spuren automatisch auf mindestens 84 px Abstand geschoben, danach wieder auf plausible Bildstellen geprüft. |
+| 20 | Audio-Test | Neues Werkzeug `tools/audiotest.js` misst den Pegel hinter dem Kompressor und prüft jeden Effekt, jede Kulisse, die Musik und den Stummschalter. |
+
+### Was dabei schiefging und wie es gefunden wurde
+
+- **Papierrascheln und Lupenzug waren unhörbar.** Der Audio-Test hat es gezeigt
+  (Pegel 0.0005 statt 0.01). Ursache: die gemeinsame Rauschquelle war braunes
+  Rauschen und hat oberhalb von 3 kHz fast keine Energie. Lösung: zweite Quelle
+  mit weissem Rauschen für alles Helle.
+- **Die Kulisse startete nicht.** Wird `kulisse()` vor der ersten Berührung
+  aufgerufen, gibt es noch keinen AudioContext. Die alte Fassung merkte sich
+  trotzdem den Namen und hielt ihn danach für bereits gesetzt. Jetzt gibt es
+  einen Wunschzustand, der nach dem Entsperren angewandt wird.
+- **Der Stempel war grau statt rot.** Der Graustufenfilter lag auf der ganzen
+  Karte und damit auch auf dem Stempel. Jetzt liegt er nur auf dem Foto.
+
 ## Stolpersteine beim Deployment
 
 - Der Container-Token darf keine neuen Repositories anlegen und nicht in sie

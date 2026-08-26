@@ -39,14 +39,55 @@ Fortschritt in `localStorage`, kein Konto, keine Datenübertragung.
 4. **Das goldene Murmeltier** — Museum, 4 Verdächtige, Logikraster
 5. **Wo ist Rösti?** — Finale, alles kombiniert, versöhnliches Ende
 
+## Bildsprache
+
+Leitbild: **Akten auf einer Schreibtischplatte.** Der Hintergrund ist dunkles
+Holz mit Lampenlicht von oben, darauf liegen helle Papierflächen mit
+Aktenreitern. Alles Inhaltliche wirkt wie Material aus einer echten Fallakte:
+
+- Tatorte sind **Fotos mit Fotoecken**, in die Mappe geklebt
+- Laborproben sind **Beweismittelkarten** auf Karton, mit Beschriftungsstreifen
+- Verdächtige sind **Passfotos**; wer ausscheidet, bekommt einen roten
+  Stempel «Ausgeschlossen» quer über das Bild
+- Spuren am Tatort sind **nummerierte Sucherrahmen** wie bei der Spurensicherung
+- Zeugenaussagen stehen auf Notizzetteln mit blauer Kante
+
+Farben: Papier (#f5efe1) und Tinte (#262b34) als Grundpaar, Messing für Aktionen,
+Polizeiblau für Fakten, Rot für Stempel und Widersprüche.
+
+## Grafik: was gezeichnet und was generiert ist
+
+| Element | Herkunft | Warum |
+|---|---|---|
+| Tatorte, Titelbild | KI-Illustration, WebP ~75 KB | Atmosphäre, die Vektorgrafik nicht liefert |
+| 28 Figurenporträts | KI-Illustration, WebP ~10 KB | Wiedererkennbare Personen |
+| Fingerabdrücke, Sohlen, Reifen, Fasern, Handschrift, Uhr, Lineal | prozedurales SVG | Probe und richtige Antwort **müssen** identisch sein – das kann eine Bildgenerierung nicht zusichern |
+| Icons, Marker, Stempel | prozedurales SVG | beliebig einfärbbar, gestochen scharf |
+
+Die Fingerabdrücke folgen einem Strömungsfeld und bilden damit die echten
+Grundmuster ab: Bogen, Schleife, Wirbel, Doppelschleife. Die Uhr ist der
+Schweizer Bahnhofsuhr nachempfunden.
+
+## Ton
+
+Vollständig synthetisiert über die WebAudio-API, keine einzige Audiodatei.
+Drei Busse (Musik, Kulisse, Effekte) laufen über einen gemeinsamen Hall
+(prozedural erzeugte Impulsantwort) und einen Kompressor.
+
+- **Fünf ortsbezogene Klangkulissen:** Regen am Klassenfenster, Bahnhof mit
+  Zugdurchfahrt und Perrongong, Dorfplatz mit Vögeln, Brunnen und Kirchenglocke,
+  Museum bei Nacht mit Uhrticken und Knarren, Waldrand mit Wind, Vögeln und Grillen.
+  Jede Kulisse besteht aus Rauschteppichen plus zufällig eingestreuten Ereignissen –
+  dadurch wiederholt sie sich nie hörbar.
+- **Titelmusik:** leichtes Detektiv-Thema mit gehender Bassfigur, Besen auf 2 und 4
+  und einer Vibraphon-Melodie. Standardmässig **aus**, per Schalter einschaltbar.
+- **Elf Effekte**, vom Papierrascheln bis zum Zweiklanghorn.
+
+Ton startet erst nach der ersten Berührung (Autoplay-Politik der Browser).
+
 ## Technische Entscheide
 
 - **Kein Framework, kein Build-Schritt.** Vanilla ES-Module. Wer das Spiel in
   fünf Jahren öffnet, braucht kein npm install.
-- **Grafik: Inline-SVG, prozedural zusammengesetzt.** Keine Bilddateien.
-  Begründung: scharf auf jedem Display, ~2 KB statt ~400 KB pro Szene,
-  Hotspots liegen im selben Koordinatensystem wie die Grafik.
-- **Ton: WebAudio-Synthese.** Keine Audiodateien. Gleiche Begründung.
-  Ton startet erst nach der ersten Nutzergeste (Autoplay-Politik).
 - **Offline:** Service Worker mit vollständigem Precache. Nach dem ersten
   Laden funktioniert das Spiel im Flugmodus.
