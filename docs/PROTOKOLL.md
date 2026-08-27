@@ -296,3 +296,98 @@ Schach: `hoerprobe.py` fragt, ob man es versteht, `lebendigkeit.py`, ob es lebt.
   darauf, ein Fall ohne Netz beim allerersten Öffnen aber schon.
 - **Die Verhaftungswand ist oben leer.** Ohne Merkmalschips sind die Karten
   flacher als in der Gegenüberstellung. Funktioniert, wirkt aber luftig.
+
+## Runde 6 – Wechsel auf Gemini TTS, Besetzung nach Geschlecht
+
+**Auftrag.** «Viel besser. Aber: Frauenfiguren sollten auch Frauenstimmen
+haben. Ändere das, dann implementiere.»
+
+Vorausgegangen war der Vergleichstest gegen Piper. Der Anlass für den Test war
+mein eigener Einwand, Gemini könnte durch seine Nicht-Determiniertheit die
+Zeugenaussagen verraten. Dieser Einwand hat den Test nicht überlebt – siehe
+unten.
+
+### Was der Vergleichstest ergab
+
+| | Piper | Gemini 3.1 Flash TTS |
+|---|---|---|
+| Tonumfang Median | 3,64 Halbtöne | 7,12 |
+| Hörprobe durchgefallen | 27 % | 8 % |
+| Znüni, Rösti | nur per Lautschrift-Eingriff | auf Anhieb |
+| Kosten je Vollausgabe | 0 | ~0,19 USD |
+
+Der Determinismustest – dreimal exakt dieselbe Aussage – ergab 0,48 Halbtöne
+Streuung bei 2,86 Halbtönen, die ich zwischen den Erzählerzeilen als hörbar
+eingerichtet habe. Der Verdacht, das Modell könnte eine Lüge anders betonen,
+weil es den Satz versteht, hielt der Kontrolle nicht stand: dieselben sechs
+Sätze zeigen bei **Piper** dasselbe Muster, und Piper versteht kein Wort. Der
+Effekt kommt vom Satzbau, nicht vom Inhalt.
+
+### Der Fehler in der ersten Besetzung
+
+Ich hatte Frau Hübscher mit **Puck** besetzt. Der Name klingt nach Kobold, die
+Stimme ist ein Mann mit 120 Hz. Gelernt: die Stimmennamen sagen nichts über
+das Geschlecht, und die Dokumentation schweigt dazu.
+
+Konsequenz: alle 30 Stimmen eingemessen, denselben neutralen Satz durch jede.
+Grundton allein reicht nicht – zwischen 150 und 175 Hz liegen hohe Männer- und
+tiefe Frauenstimmen übereinander. Erst die **Formanten** trennen sauber, weil
+sie die Länge des Ansatzrohrs zeigen und nicht von der Tonhöhe abhängen.
+Ergebnis: 14 männlich, 15 weiblich, 1 Grenzfall (Pulcherrima).
+
+Die Besetzung steht in `tools/voice.py`, die Messwerte im Kommentar darüber.
+Gemini hat keine Kinderstimmen; Kevin und Luis bekommen eine helle Stimme plus
+das Alter als Regieanweisung (`regie.FIGUR`) – beim Synchronisieren von
+Kinderrollen das übliche Vorgehen.
+
+### Umbau
+
+* `tools/regie.py` – liefert statt sechs Zahlenwerten einen deutschen
+  Regiesatz. Gemini versteht Sprache, also ist die Anweisung Sprache.
+  Zeugenaussagen bekommen weiterhin **eine einzige, identische** Anweisung.
+* `tools/voice.py` – auf die Gemini-REST-API umgestellt. Jede frische Aufnahme
+  wird sofort abgehört; bei mitgesprochener Regie oder Nuscheln bis zu vier
+  Anläufe, und **der beste** wird behalten, nicht der letzte.
+* `tools/regietest.py` – neu. Prüft vor 135 Modellaufrufen, dass jede
+  Schreibregel greift, kein Regiewort im Spieltext vorkommt, jeder Zeuge genau
+  eine Anweisung hat und jede sprechende Rolle besetzt ist.
+* `tools/aussprache.py` – bleibt liegen, wird nicht mehr gebraucht. Die
+  Lautschrift-Ebene gibt es bei Gemini nicht; an ihre Stelle tritt
+  `regie.LAUTSCHREIBUNG` mit genau einem gemessenen Eintrag
+  («Zickzack-Sohle» → «Zick-Zack-Sohle», sonst «Tick-Tack-Sole»).
+
+### Zwei Messfallen, in die ich gelaufen bin
+
+1. **Die Hörprobe war zu streng.** Der Erkenner trennt Komposita auf:
+   «Zickzack-Sohle» kommt als «Zick zack Sohle» zurück – wortweise ein
+   Totalausfall, gesprochen tadellos. Vier Modellaufrufe verschwendet, bis ich
+   buchstabenweise dazunahm.
+2. **Und dann zu milde.** Buchstabenweise sind «Röstis» und «Rustys» 0,88 –
+   der Hund heisst aber anders. Jetzt gilt: sauber ist, was wortweise ≥ 0,85
+   **oder** buchstabenweise ≥ 0,97 erreicht.
+
+`Luis` kommt beim Erkenner als `Louis` zurück – dieselbe Aussprache, die
+gebräuchlichere Schreibweise. Das ist in `hoerprobe.ZAHL` normalisiert.
+`Louise` bewusst nicht: das ist ein anderer Name.
+
+### Ergebnis
+
+| | Runde 5 (Piper) | Runde 6 (Gemini) |
+|---|---|---|
+| Tonumfang Erzähler | 3,64 | **6,53** Halbtöne |
+| Tonumfang alle | 3,64 | **6,13** |
+| Grundton zwischen den Zeilen | 2,86 | **5,04** Halbtöne |
+| Lautheit zwischen den Zeilen | 2,41 | **3,29** dB |
+| Tempo zwischen den Zeilen | 20 % | **25 %** |
+| Hörprobe sauber | 99 von 135 | **132 von 135** |
+| Länge gesamt | 386 s | 628 s |
+| Grösse | 3,0 MB | 4,9 MB |
+
+Die drei verbleibenden Auffälligkeiten sind samt und sonders Tokenisierung des
+Erkenners («Mountain-Bike», «Leid getan»), keine Aussprachefehler.
+
+**Nebenwirkung:** die Aufnahmen sind im Schnitt 63 % länger. Der Spieltest
+lief deshalb zunächst in einen Timeout – er klickte mit fester Wartezeit in
+eine noch laufende Lineup-Runde hinein. `tools/test.js` wartet jetzt auf den
+Rundenzähler statt auf die Uhr. Ob das Spiel dadurch zäher wirkt, entscheidet
+kein Messwert, sondern das Kind.

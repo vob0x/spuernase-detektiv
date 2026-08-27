@@ -110,36 +110,88 @@ Grösse, Zehenzahl, Krallen und Schrittweite — nicht bloss im Massstab.
 
 ### Sprache
 
-135 Aufnahmen, erzeugt mit **Piper** (neuronales TTS, lokal). Zwei Modelle:
+135 Aufnahmen, erzeugt mit **Gemini 3.1 Flash TTS** über die REST-API. Der
+Vorgänger war Piper (lokal, `de_DE-thorsten`); der Wechsel ist in Runde 6
+gemessen worden:
 
-- **Wachtmeister Brünnli und alle Erklärtexte:** `de_DE-thorsten-high`
-- **Figuren:** `de_DE-thorsten_emotional-medium` — derselbe Sprecher in acht
-  Färbungen, dazu eine Tonhöhenverschiebung von −6 % bis +18 %.
+| | Piper | Gemini |
+|---|---|---|
+| Tonumfang Median | 3,64 Halbtöne | **7,12** |
+| Hörprobe durchgefallen | 27 % | **8 %** |
+| «Znüni», «Rösti» | nur per Eingriff in die Lautschrift | auf Anhieb |
+| Stimmen | 1 Sprecher, 8 Färbungen | **30 eigenständige** |
+| Kosten je Vollausgabe | 0 | ~0,19 USD |
 
-Die Besetzung ist **gemessen, nicht geraten**: derselbe Satz läuft durch jede
-Einstellung und wird danach von einem Spracherkenner abgehört. Über fünf kurze
-Zeugensätze gemittelt:
+Ungewöhnlich daran: Lebendigkeit und Verständlichkeit ziehen sonst
+gegeneinander. Hier gewinnen beide.
 
-| Einstellung | verstanden |
-|---|---|
-| emotional «amused» +12 % | 0,97 |
-| emotional «surprised» | 0,93 |
-| emotional «neutral» | 0,92 |
-| thorsten-high −6 % | 0,89 |
-| thorsten-high unverändert | 0,82 |
-| eva_k (weiblich, x_low) | 0,76 |
-| **mls-medium (früher benutzt)** | **0,72** |
+### Besetzung: gemessen, nicht nach Namen geraten
 
-Daraus die Regeln: kein `mls-medium` mehr, kein `eva_k`, **keine
-Tempoänderungen** (kosteten in jeder Messung Verständlichkeit) und
-Tonhöhenverschiebung nur über `rubberband` mit erhaltenen Formanten. Die frühere
-Methode `asetrate` verschob die Formanten mit — die Stimme klang gepresst und
-die Verständlichkeit fiel von 1,00 auf 0,88.
+Die Stimmennamen sagen nichts über das Geschlecht, und die Dokumentation
+schweigt dazu. **Puck** klingt nach Kobold und ist ein Mann mit 120 Hz — so
+wurde Frau Hübscher im ersten Anlauf von einem Mann gesprochen.
 
-Das kostet Vielfalt: alle Figuren sind hörbar derselbe Sprecher in
-verschiedenen Färbungen. Für Deutsch hat Piper keine zweite gute Stimme. Wer
-echte Vielfalt will, muss die 135 Zeilen von Menschen einsprechen lassen — die
-Kennungen stehen in `js/voice-liste.js`, am Programm ändert sich nichts.
+Deshalb laufen alle 30 Stimmen einmal durch denselben neutralen Satz. Der
+Grundton allein reicht nicht: zwischen 150 und 175 Hz liegen hohe Männer- und
+tiefe Frauenstimmen übereinander. Erst die **Formanten** trennen sauber, weil
+sie die Länge des Ansatzrohrs zeigen und von der Tonhöhe unabhängig sind.
+
+| Stimme | Grundton | F3 | Lage | Rolle |
+|---|---|---|---|---|
+| Iapetus | 126 Hz | 2746 | männlich | Erzähler (108 Zeilen) |
+| Rasalgethi | 139 Hz | 2746 | männlich | Herr Frei |
+| Alnilam | 110 Hz | 2713 | männlich | Herr Kunz |
+| Algenib | 129 Hz | 2508 | männlich | Herr Sutter |
+| Gacrux | 152 Hz | 2958 | weiblich | Frau Odermatt |
+| Kore | 171 Hz | 2909 | weiblich | Frau Rüegg |
+| Callirrhoe | 169 Hz | 2951 | weiblich | Frau Beeler |
+| Vindemiatrix | 163 Hz | 2880 | weiblich | Frau Hübscher |
+| Fenrir | 193 Hz | 3032 | weiblich | Kevin |
+| Leda | 181 Hz | 3057 | weiblich | Luis |
+
+Insgesamt: 14 männlich, 15 weiblich, 1 Grenzfall.
+
+Gemini hat **keine Kinderstimmen**. Kevin und Luis bekommen eine helle Stimme
+plus das Alter als Regieanweisung («Du bist ein zehnjähriger Junge») — beim
+Synchronisieren von Kinderrollen das übliche Vorgehen, und es wirkt messbar:
+dieselbe Stimme steigt dadurch von 118 auf 141 Hz.
+
+### Was das Modell schlechter kann als Piper
+
+* Es **spricht gelegentlich die Regieanweisung mit** («Neugierig fragend? Wer
+  hat andere Schuhe?»). Deshalb hört `tools/voice.py` jede frische Aufnahme
+  sofort ab und wiederholt bis zu viermal. Behalten wird der beste Versuch,
+  nicht der letzte — Gemini ist nicht deterministisch, dieselbe Zeile kam im
+  Messlauf einmal als «Wellenzule» und einmal als «Wellensohle» zurück.
+* Es ist ein **Vorschaumodell ohne Zusicherung**. Die fertigen MP3 sind davon
+  nicht betroffen, ein Neubau in einem Jahr kann anders klingen.
+* Es gibt **keine Lautschrift-Ebene** mehr. Wo bei Piper ein Eingriff in die
+  Phonemkette möglich war, bleibt nur die Orthografie: `regie.LAUTSCHREIBUNG`
+  enthält genau einen gemessenen Eintrag («Zickzack-Sohle» → «Zick-Zack-Sohle»,
+  sonst «Tick-Tack-Sole»). Er ändert nur den gesprochenen Text, nie den auf
+  dem Bildschirm.
+* Die Aufnahmen sind **63 % länger** (4,65 statt 2,86 Sekunden im Schnitt).
+  Das Spiel wartet zwischen den Schritten entsprechend länger.
+
+### Die Zeugenaussagen — die eine Regel, die nicht verhandelbar ist
+
+Alle Aussagen eines Zeugen bekommen **exakt dieselbe** Anweisung. Klänge die
+Lüge anders als die Wahrheit, wäre das Rätsel verraten.
+
+Der naheliegende Einwand gegen ein Sprachmodell lautet: es *versteht* den Satz,
+also betont es eine Ausrede vielleicht ausweichender. Gemessen:
+
+* Dreimal exakt dieselbe Aussage streut um **0,48 Halbtöne** und **0,73 dB** —
+  weit unter den 2,86 Halbtönen, die zwischen den Erzählerzeilen bewusst als
+  hörbarer Unterschied eingerichtet sind.
+* Über drei unabhängige Durchgänge ist die Lüge in 6 von 6 Fällen melodischer,
+  im Mittel um 1,50 Halbtöne. **Aber:** dieselben sechs Sätze zeigen bei Piper
+  dasselbe Muster — und Piper versteht kein Wort von dem, was es liest. Der
+  Effekt kommt vom Satzbau, nicht vom Inhalt.
+
+Das Rätsel ist mit Gemini also nicht stärker gefährdet als vorher. Die
+Stichprobe ist mit zwei Zeugen dünn; wer das genauer wissen will, muss mehr
+Zeugen messen.
 
 ### Regie: warum jede Zeile anders gelesen wird
 
@@ -212,28 +264,37 @@ Nutzung erlaubt.
 
 ### Aussprache
 
-espeak-ng, das Piper zum Einlauten benutzt, stolpert über Schweizer Wörter.
-«Znüni» wurde zu **«Zett-Nüni»**: espeak kann die Lautfolge /tsn/ am Wortanfang
-nicht bilden und liest das Z als Buchstabennamen.
+Gemini liest «Znüni», «Rösti», «Guetzli» und «Bärenmoos» auf Anhieb richtig.
+Das war bei Piper der grösste Einzelaufwand der ganzen Vertonung und ist jetzt
+schlicht kein Thema mehr.
 
-`tools/aussprache.py` korrigiert das auf zwei Ebenen:
+Was bleibt, ist ein anderer Fehlertyp: das Modell liest gelegentlich ein Wort
+anders, als es beim vorigen Aufruf gelesen hat. «Wellensohle» kam einmal als
+«Wellenzule» zurück und beim nächsten Versuch tadellos. Deshalb wird jede
+Aufnahme abgehört und notfalls wiederholt — nicht ein Wörterbuch gepflegt.
 
-1. **Im Text**, wo schon die Schreibweise das Problem ist: Notrufnummern
-   ziffernweise («117» → «eins eins sieben»), Gender-Doppelpunkt, Uhrzeitspannen.
-2. **In der Lautschrift**, direkt an den Phonemen. Das ist genauer als jede
-   Ersatzschreibweise — «Tsnüni» hätte espeak wieder buchstabiert.
+Nur wo ein Wort **wiederholt** danebengeht, kommt eine Schreibregel in
+`regie.LAUTSCHREIBUNG`. Derzeit genau eine: «Zickzack-Sohle» kam dreimal als
+«Tick-Tack-Sole», «Zick-Zack-Sohle» sitzt. Die Regel ändert nur den Text, der
+ans Modell geht — auf dem Bildschirm steht weiter das Original.
 
-Zwanzig Einträge, darunter Znüni, Guetzli, Rösti, Rennvelo, Forsthaus (das *h*
-fehlte), durchs (das *ch* fehlte), erreichst (*ch* war zu *k* geworden),
-gesprayt und die Fälle, in denen espeak ein dunkles /ɑː/ statt /aː/ setzt.
+Zwei Messfallen aus dem Umbau, beide lehrreich:
 
-Ein Eintrag hat es **nicht** in die Liste geschafft: bei «Fingerabdrücke» war
-espeaks eigene Lautung im Hörtest besser als meine Korrektur (1,00 gegen 0,62).
-Deshalb wird jeder Eintrag gegengeprüft, statt ihn nur plausibel zu finden.
+1. **Die Prüfung war zu streng.** Der Erkenner trennt Komposita auf:
+   «Zickzack-Sohle» kommt als «Zick zack Sohle» zurück — wortweise ein
+   Totalausfall, gesprochen tadellos. Das kostete vier Modellaufrufe, bis der
+   buchstabenweise Vergleich dazukam.
+2. **Und dann zu milde.** Buchstabenweise sind «Röstis» und «Rustys» 0,88 —
+   der Hund heisst aber anders. Es gilt jetzt: sauber ist, was wortweise
+   ≥ 0,85 **oder** buchstabenweise ≥ 0,97 erreicht.
 
-Vier Zeilen wurden stattdessen **umgeschrieben**, weil keine Lautkorrektur half:
-aus «Rösti bellt.» wurde «Hörst du Rösti?» — zwei Wörter mit Punkt geben dem
-Modell zu wenig Kontext.
+Der Name «Luis» kommt vom Erkenner als «Louis» zurück: dieselbe Aussprache,
+die gebräuchlichere Schreibweise. Das ist in `hoerprobe.ZAHL` normalisiert —
+«Louise» bewusst nicht, denn das ist ein anderer Name.
+
+Aus der Piper-Zeit übrig geblieben, nicht mehr in Gebrauch:
+`tools/aussprache.py` mit zwanzig Lautschrift-Einträgen. Die Datei bleibt als
+Beleg liegen; wer je zu einem lokalen Modell zurückkehrt, braucht sie wieder.
 
 Nachbearbeitung mit ffmpeg: Hochpass bei 70 Hz, Lautheitsangleich auf einen
 Zielwert **je nach Lage** (−13 dB im Jubel, −20 dB im dunklen Museum), dann

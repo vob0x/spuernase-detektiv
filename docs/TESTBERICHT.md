@@ -1,7 +1,10 @@
 # Testbericht
 
 Fünf Prüfläufe: zwei im Browser über Playwright (Spiel und Ton), drei in Python
-für die Sprache – Aussprache, Verständlichkeit und Lebendigkeit. Bühne 1000 × 480 (Querformat), `deviceScaleFactor: 2`.
+für die Sprache – Regie, Verständlichkeit und Lebendigkeit. Bühne 1000 × 480
+(Querformat), `deviceScaleFactor: 2`.
+
+Stand: Runde 6, Vertonung über Gemini 3.1 Flash TTS.
 
 ## 1. Spiel — `node tools/test.js`
 
@@ -107,27 +110,38 @@ kontrolliert.
 ```
 
 
-## 3. Aussprache — `python3 tools/aussprachetest.py`
+## 3. Regie — `python3 tools/regietest.py`
 
-Lautet alle 135 Zeilen ein und prüft drei Dinge:
+Läuft **vor** der Vertonung, damit nicht 135 Modellaufrufe an einem Fehler
+scheitern, den man vorher sehen kann. Vier Prüfungen:
 
-- **Greift jeder Wörterbucheintrag?** Tote Einträge werden als solche gemeldet.
-- **Ist die falsche Lautfolge danach verschwunden?** Jeder Eintrag wird gezählt,
-  vorher und nachher.
-- **Kennt jede Stimme jeden Laut, den wir erzeugen?** Diese Prüfung fand den
-  Fehler, bei dem aus «ich» ein «ick» wurde.
+- **Greift jede Schreibregel?** Eine Regel, die auf keiner Zeile mehr zutrifft,
+  ist toter Code und wird gemeldet.
+- **Steht ein Regiewort auch im Spieltext?** Dann meldete die Hörprobe in
+  `voice.py` einen Fehlalarm und wiederholte eine tadellose Zeile viermal.
+  («Detektivbüro» und «Zeuge» stehen deshalb bewusst nicht auf der Liste.)
+- **Hat jeder Zeuge genau eine Anweisung für alle seine Aussagen?** Das ist die
+  einzige Prüfung hier, deren Ausfall nicht den Klang, sondern das **Rätsel**
+  kaputtmacht: unterschiedliche Anweisungen verraten die Lüge am Tonfall.
+- **Ist jede sprechende Rolle besetzt?**
 
 ```
-  ✓  tsˈɛtnˈyːniː           -> tsnˈyːni             3x ersetzt
-  ✓  ɡuːˈɛtsliː             -> ɡˈuːtsli             2x ersetzt
-  ✓  rˈœstiː                -> rˈøːsti              6x ersetzt
-  ...
-Buchstabierte Wortanfänge:
-  vorher 2 Wörter betroffen (Znüni, Znüni-Kuchen), jetzt 0
-Lautbestand der Stimmen:
-  ✓ de_DE-thorsten-high: alle Laute vorhanden
-  ✓ de_DE-thorsten_emotional-medium: alle Laute vorhanden
-✓ Aussprachewörterbuch greift vollständig
+✓ «Zickzack-Sohle» → «Zick-Zack-Sohle»  (1×: f1-lab0-e)
+✓ 25 Regiewörter, keines im Spieltext
+✓ 9 Zeugen, je eine einzige Anweisung für alle Aussagen
+✓ 10 sprechende Rollen, alle besetzt
+    beeler         3 Zeilen  →  Callirrhoe
+    erzaehler    108 Zeilen  →  Iapetus
+    frei           3 Zeilen  →  Rasalgethi
+    huebscher      3 Zeilen  →  Vindemiatrix
+    kevin          3 Zeilen  →  Fenrir
+    kunz           3 Zeilen  →  Alnilam
+    luis           3 Zeilen  →  Leda
+    odermatt       3 Zeilen  →  Gacrux
+    rueegg         3 Zeilen  →  Kore
+    sutter         3 Zeilen  →  Algenib
+
+✓ Regie in Ordnung
 ```
 
 ## 4. Hörprobe — `python3 tools/hoerprobe.py`
@@ -136,17 +150,24 @@ Ein Spracherkenner hört jede Aufnahme ab und vergleicht sie mit dem Text.
 Zahlen werden vorher vereinheitlicht, damit «24 cm» und «vierundzwanzig
 Zentimeter» als gleich gelten.
 
-| | vorher | nachher |
+| | Piper (Runde 5) | Gemini (Runde 6) |
 |---|---|---|
-| alle Aufnahmen sauber verstanden | 93 von 135 | 102 von 135 |
-| **Figurenzeilen** | **5 von 27** | **21 von 27** |
-| Erzählerzeilen | 88 von 108 | 81 von 108 |
+| alle Aufnahmen sauber verstanden | 99 von 135 | **132 von 135** |
 
-Der Erzähler blieb unverändert (`thorsten-high`, keine Bearbeitung); die
-Schwankung dort ist der Erkenner, nicht die Sprache. Eine Gegenprobe mit einem
-grösseren Modell hat 14 der 27 auffälligen Erzählerzeilen als sauber bestätigt.
-Was übrig bleibt, sind Namen und Fremdwörter, die der Erkenner nicht kennt:
-Rüegg, Beeler, Egli, Znüni, Guetzli, Mountainbike.
+Die drei verbliebenen Auffälligkeiten sind samt und sonders Tokenisierung des
+Erkenners, keine Aussprachefehler:
+
+```
+  f1-lab0-e   Text: Zickzack-Sohle.              Gehört: Zick zack Sohle.
+  f2-verf-f   Text: Folge der Mountainbike-Spur! Gehört: Folge der Mountain-Bike-Spur
+  f5-z1-a2    Text: ... ich bin weitergelaufen.  Gehört: ... ich bin weiter gelaufen.
+```
+
+Beim Wechsel auf Gemini kam eine zweite Verwendung dazu: `voice.py` hört
+**jede frische Aufnahme sofort ab**, noch bevor sie liegen bleibt. Das Modell
+spricht gelegentlich die Regieanweisung mit («Neugierig fragend? Wer hat andere
+Schuhe?») — ein Fehler, den kein Blick auf die Datei findet. Bis zu vier
+Anläufe, behalten wird der beste.
 
 Das Werkzeug ist ein **Diagnose-Instrument, kein Qualitätsurteil**. Es findet
 grobe Fehler zuverlässig — buchstabierte Wörter, unverständliche Stimmen — und
@@ -175,28 +196,33 @@ beziehungsweise 1,8 dB sinkt.
 
 ```
 Rolle           Zeilen  Tonumfang  Tonspanne  Rhythmus  Urteil
-erzaehler          108      3.64       9.21      0.43  lebendig
-odermatt             3      4.75       7.27      0.39  sehr lebendig
+erzaehler          108      6.53      16.61      0.54  sehr lebendig
+odermatt             3      5.24      12.00      0.36  sehr lebendig
+kevin                3      5.14      12.65      0.35  sehr lebendig
 ...
-ALLE               135      3.64       8.80      0.42  lebendig
+ALLE               135      6.13      15.77      0.52  sehr lebendig
 
 Abwechslung zwischen den 108 Erzählerzeilen:
-  Grundton    2.86 Halbtöne
-  Tempo         20 %
-  Lautheit    2.41 dB
+  Grundton    5.04 Halbtöne
+  Tempo         25 %
+  Lautheit    3.29 dB
 ```
 
 ### Die beiden Messungen im Widerstreit
 
 Sie ziehen in entgegengesetzte Richtungen, und das ist beabsichtigt:
 
-| Ausdrucksregler | Hörprobe | Tonumfang |
+| Fassung | Hörprobe | Tonumfang |
 |---|---|---|
-| 0,667 (Modellvorgabe) | 102 von 135 | 3,15 |
-| 0,667–0,75 mit Regie | **99 von 135** | **3,64** |
-| 0,80–1,00 mit Regie | 89 von 135 | 3,90 |
+| Piper, ohne Regie | 102 von 135 | 3,15 |
+| Piper, Ausdruck 0,80–1,00 | 89 von 135 | 3,90 |
+| Piper, Ausdruck 0,667–0,75 mit Regie | 99 von 135 | 3,64 |
+| **Gemini mit Regie** | **132 von 135** | **6,13** |
 
-Die mittlere Zeile ist der gewählte Kompromiss.
+Bei Piper war es ein Kompromiss: mehr Ausdruck kostete Verständlichkeit. Der
+Wechsel auf Gemini löst den Zielkonflikt auf — beide Werte steigen. Das ist
+ungewöhnlich genug, um es zu benennen, statt es als selbstverständlich zu
+verbuchen.
 
 ## Was die Tests in dieser Runde gefunden haben
 
@@ -215,6 +241,11 @@ Die mittlere Zeile ist der gewählte Kompromiss.
 | Manifest stand auf `orientation: portrait` | Rest aus der Hochformat-Fassung | auf `landscape` gesetzt |
 | Sprache liess sich nicht prüfen | AAC fehlt im quelloffenen Chromium | alles neu als MP3 |
 | Vier Bildschirme mit dunkler Schrift auf dunklem Holz | `kopf--dunkel` fälschlich gesetzt | auf hell umgestellt |
+| Frau Hübscher sprach mit Männerstimme | Besetzung nach Stimmennamen statt nach Messung — «Puck» klingt nach Kobold und ist ein Mann mit 120 Hz | alle 30 Stimmen eingemessen, Grundton **und** Formanten |
+| Vier Modellaufrufe an einer tadellosen Zeile verschwendet | Prüfung wortweise; der Erkenner trennt «Zickzack-Sohle» zu «Zick zack Sohle» | zusätzlich buchstabenweiser Vergleich |
+| «Röstis» kam als «Rustys» durch | buchstabenweise allein ist zu milde (0,88) | sauber ist wortweise ≥ 0,85 **oder** buchstabenweise ≥ 0,97 |
+| Wiederholung machte eine Zeile schlechter | es wurde der letzte Versuch behalten, nicht der beste | `bauen()` behält den bestbewerteten Anlauf |
+| Spieltest lief in vier Timeouts | Aufnahmen 63 % länger, der Test klickte mit fester Wartezeit in eine laufende Lineup-Runde | `test.js` wartet auf den Rundenzähler statt auf die Uhr |
 
 ## Was die Tests **nicht** abdecken
 
@@ -224,3 +255,8 @@ Die mittlere Zeile ist der gewählte Kompromiss.
   Klangqualität. Ob die synthetischen Stimmen für ein Kind angenehm sind,
   entscheidet nur Zuhören.
 - **Ob die Rätsel für Achtjährige lösbar sind.** Das zeigt erst ein Kind.
+- **Ob eine Stimme zur Figur passt.** Gemessen ist nur, ob sie männlich oder
+  weiblich klingt. Ob Frau Odermatt nach Ladenbesitzerin klingt und Kevin nach
+  einem Jungen und nicht nach einer jungen Frau, entscheidet das Ohr.
+- **Ob das Spiel jetzt zäh wirkt.** Die Aufnahmen sind im Schnitt 63 % länger.
+  Kein Messwert sagt, ob ein Kind das als ruhiger oder als langsamer erlebt.
