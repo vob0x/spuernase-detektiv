@@ -19,8 +19,14 @@ Warum es so gebaut ist, wie es gebaut ist:
   Die alte Methode (asetrate) verschob die Formanten mit und klang gepresst;
   im Messlauf fiel die Verständlichkeit dabei von 1,00 auf 0,88.
 
-Gemessen wird das Ergebnis mit tools/hoerprobe.py: ein Spracherkenner hört
-jede Aufnahme ab und vergleicht sie mit dem Text.
+* **Lebendigkeit.** Wer nur auf Verständlichkeit optimiert, landet bei einer
+  flachen Stimme – die ist am leichtesten zu erkennen. Deshalb bekommt jede
+  Zeile eine Regieanweisung (tools/regie.py): Färbung, Tempo, Lautheit und
+  Tonhöhe richten sich danach, was gerade passiert. Gemessen mit
+  tools/lebendigkeit.py.
+
+Zwei Messungen halten sich gegenseitig in Schach: tools/hoerprobe.py prüft,
+ob man es versteht, tools/lebendigkeit.py, ob es lebt.
 """
 import hashlib, json, os, subprocess, sys, wave
 
@@ -28,6 +34,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from aussprache import text_vorbereiten, laute_korrigieren
+from regie import anweisung, text_faerben, situation
 
 STIMMEN = "/home/claude/voices"
 HIGH = f"{STIMMEN}/de_DE-thorsten-high.onnx"           # männlich, beste Qualität
@@ -58,7 +65,10 @@ AMUSED, ANGRY, DISGUSTED, DRUNK, NEUTRAL, SLEEPY, SURPRISED, WHISPER = range(8)
 # Färbungen. Für Deutsch gibt es bei Piper keine zweite gute Stimme; wer echte
 # Vielfalt will, muss die 135 Zeilen von Menschen einsprechen lassen.
 CAST = {
-    'erzaehler':  (HIGH, None,      1.00),   # Wachtmeister Brünnli und alle Erklärtexte
+    # Der Erzähler läuft über das Färbungsmodell, nicht über thorsten-high:
+    # nur so lässt sich der Tonfall je Situation wechseln. Die Färbung setzt
+    # nicht die Besetzung, sondern die Regie (tools/regie.py) pro Zeile.
+    'erzaehler':  (EMO,  None,      1.00),
 
     # Frauen – helle Färbung, unterschiedlich hoch
     'odermatt':   (EMO,  AMUSED,    1.08),
@@ -177,12 +187,16 @@ def modell(pfad):
     return _modelle[pfad]
 
 
-def sprechen(V, text, sprecher):
-    """Text einlauten, Aussprache korrigieren, Audio erzeugen."""
+def sprechen(V, text, sprecher, tempo=1.0, rhythmus=1.0, ausdruck=None):
+    """Text einlauten, Aussprache korrigieren, Audio erzeugen.
+
+    tempo   – length_scale, grösser heisst langsamer.
+    rhythmus – noise_w_scale, grösser heisst ungleichmässigere Silbenlängen.
+               Beides kommt aus der Regieanweisung für diese Zeile."""
     from piper import SynthesisConfig
-    cfg = SynthesisConfig(normalize_audio=True)
-    if sprecher is not None:
-        cfg = SynthesisConfig(speaker_id=sprecher, normalize_audio=True)
+    cfg = SynthesisConfig(normalize_audio=True, speaker_id=sprecher,
+                          length_scale=tempo, noise_w_scale=rhythmus,
+                          noise_scale=ausdruck)
 
     saetze = V.phonemize(text_vorbereiten(text))
     stuecke = []
@@ -227,20 +241,26 @@ def bauen(nur=None, alles_neu=False):
     for vid, text, rolle in L:
         mod, spk, hoehe = CAST.get(rolle, CAST['erzaehler'])
         sig = hashlib.sha1(
-            f"{text}|{rolle}|{mod}|{spk}|{hoehe}|v6".encode()).hexdigest()[:12]
+            f"{text}|{rolle}|{mod}|{spk}|{hoehe}|{anweisung(vid, rolle)}|v9".encode()).hexdigest()[:12]
         ziel = f"{ZIEL}/{vid}.mp3"
         if stand.get(vid) == sig and os.path.exists(ziel):
             continue
 
+        faerbung, tempo, laut, hoehe_r, rhythmus, ausdruck = anweisung(vid, rolle)
+        # Rollen mit eigener Färbung behalten sie – sonst klänge jede Figur
+        # in jeder Situation anders und wäre nicht mehr wiederzuerkennen.
+        sprecher = spk if spk is not None else (faerbung if mod == EMO else None)
+
         V = modell(mod)
-        audio = sprechen(V, text, spk)
+        audio = sprechen(V, text_faerben(vid, text), sprecher, tempo, rhythmus, ausdruck)
         wav_schreiben('/tmp/_v.wav', audio, V.config.sample_rate)
 
         af = []
-        if abs(hoehe - 1.0) > 0.001:
+        gesamt = hoehe * hoehe_r
+        if abs(gesamt - 1.0) > 0.001:
             # Formanten bleiben stehen: die Stimme wird höher, nicht gepresst.
-            af.append(f"rubberband=pitch={hoehe:.4f}:formant=preserved")
-        af.append("highpass=f=70,loudnorm=I=-16:TP=-1.5:LRA=11")
+            af.append(f"rubberband=pitch={gesamt:.4f}:formant=preserved")
+        af.append(f"highpass=f=70,loudnorm=I={laut}:TP=-1.5:LRA=11")
 
         subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', '/tmp/_v.wav',
                         '-af', ','.join(af), '-c:a', 'libmp3lame', '-b:a', '64k',
