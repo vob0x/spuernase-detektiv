@@ -3,7 +3,8 @@
 **Zielgruppe:** Kinder ab 8 Jahren (Schweiz, 2.–4. Klasse)
 **Plattform:** Progressive Web App, **Querformat**, mobile-first, vollständig offline
 **Sprache:** Standarddeutsch, kurze Sätze, Schweizer Rechtschreibung (ss statt ß)
-**Vertonung:** jede Zeile ist gesprochen — 135 Aufnahmen, keine Gerätestimme
+**Vertonung:** jede Zeile ist gesprochen — 135 Aufnahmen mit eigenem
+Aussprachewörterbuch, keine Gerätestimme
 
 ## Leitidee
 
@@ -109,19 +110,64 @@ Grösse, Zehenzahl, Krallen und Schrittweite — nicht bloss im Massstab.
 
 ### Sprache
 
-135 Aufnahmen, erzeugt mit **Piper** (neuronales TTS, lokal) aus zwei deutschen
-Modellen:
+135 Aufnahmen, erzeugt mit **Piper** (neuronales TTS, lokal). Zwei Modelle:
 
 - **Wachtmeister Brünnli und alle Erklärtexte:** `de_DE-thorsten-high`
-- **26 Figuren:** `de_DE-mls-medium`, zehn verschiedene Sprecher-Kennungen,
-  jede Figur zusätzlich in Tonhöhe (0,97–1,16) und Tempo (0,95–1,04) verstellt.
-  Kinder klingen dadurch hörbar jünger als Erwachsene.
+- **Figuren:** `de_DE-thorsten_emotional-medium` — derselbe Sprecher in acht
+  Färbungen, dazu eine Tonhöhenverschiebung von −6 % bis +18 %.
+
+Die Besetzung ist **gemessen, nicht geraten**: derselbe Satz läuft durch jede
+Einstellung und wird danach von einem Spracherkenner abgehört. Über fünf kurze
+Zeugensätze gemittelt:
+
+| Einstellung | verstanden |
+|---|---|
+| emotional «amused» +12 % | 0,97 |
+| emotional «surprised» | 0,93 |
+| emotional «neutral» | 0,92 |
+| thorsten-high −6 % | 0,89 |
+| thorsten-high unverändert | 0,82 |
+| eva_k (weiblich, x_low) | 0,76 |
+| **mls-medium (früher benutzt)** | **0,72** |
+
+Daraus die Regeln: kein `mls-medium` mehr, kein `eva_k`, **keine
+Tempoänderungen** (kosteten in jeder Messung Verständlichkeit) und
+Tonhöhenverschiebung nur über `rubberband` mit erhaltenen Formanten. Die frühere
+Methode `asetrate` verschob die Formanten mit — die Stimme klang gepresst und
+die Verständlichkeit fiel von 1,00 auf 0,88.
+
+Das kostet Vielfalt: alle Figuren sind hörbar derselbe Sprecher in
+verschiedenen Färbungen. Für Deutsch hat Piper keine zweite gute Stimme. Wer
+echte Vielfalt will, muss die 135 Zeilen von Menschen einsprechen lassen — die
+Kennungen stehen in `js/voice-liste.js`, am Programm ändert sich nichts.
+
+### Aussprache
+
+espeak-ng, das Piper zum Einlauten benutzt, stolpert über Schweizer Wörter.
+«Znüni» wurde zu **«Zett-Nüni»**: espeak kann die Lautfolge /tsn/ am Wortanfang
+nicht bilden und liest das Z als Buchstabennamen.
+
+`tools/aussprache.py` korrigiert das auf zwei Ebenen:
+
+1. **Im Text**, wo schon die Schreibweise das Problem ist: Notrufnummern
+   ziffernweise («117» → «eins eins sieben»), Gender-Doppelpunkt, Uhrzeitspannen.
+2. **In der Lautschrift**, direkt an den Phonemen. Das ist genauer als jede
+   Ersatzschreibweise — «Tsnüni» hätte espeak wieder buchstabiert.
+
+Zwanzig Einträge, darunter Znüni, Guetzli, Rösti, Rennvelo, Forsthaus (das *h*
+fehlte), durchs (das *ch* fehlte), erreichst (*ch* war zu *k* geworden),
+gesprayt und die Fälle, in denen espeak ein dunkles /ɑː/ statt /aː/ setzt.
+
+Ein Eintrag hat es **nicht** in die Liste geschafft: bei «Fingerabdrücke» war
+espeaks eigene Lautung im Hörtest besser als meine Korrektur (1,00 gegen 0,62).
+Deshalb wird jeder Eintrag gegengeprüft, statt ihn nur plausibel zu finden.
+
+Vier Zeilen wurden stattdessen **umgeschrieben**, weil keine Lautkorrektur half:
+aus «Rösti bellt.» wurde «Hörst du Rösti?» — zwei Wörter mit Punkt geben dem
+Modell zu wenig Kontext.
 
 Nachbearbeitung mit ffmpeg: Hochpass bei 70 Hz, Lautheitsangleich auf −16 LUFS,
-dann **MP3, 48 kbit/s, mono, 24 kHz**. Gesamt rund 2,2 MB.
-
-MP3 und nicht AAC: AAC fehlt in quelloffenen Chromium-Bauten und lässt sich
-darum in der Testumgebung nicht prüfen. MP3 spielt jedes Zielgerät ab.
+dann **MP3, 64 kbit/s, mono, 22 kHz**. Gesamt rund 2,9 MB.
 
 Während gesprochen wird, senkt `ducken()` Kulisse und Musik ab.
 Das Vorlesen ist abschaltbar; der Text bleibt dann sichtbar stehen.
@@ -132,11 +178,34 @@ Vollständig synthetisiert über die WebAudio-API. Drei Busse (Musik, Kulisse,
 Effekte) laufen über einen gemeinsamen Hall (prozedural erzeugte Impulsantwort)
 und einen Kompressor.
 
-- **Fünf ortsbezogene Klangkulissen:** Regen am Klassenfenster, Bahnhof mit
-  Zugdurchfahrt und Perrongong, Dorfplatz mit Vögeln, Brunnen und Kirchenglocke,
-  Museum bei Nacht mit Uhrticken und Knarren, Waldrand mit Wind, Vögeln und Grillen.
-  Jede Kulisse besteht aus Rauschteppichen plus zufällig eingestreuten Ereignissen –
-  dadurch wiederholt sie sich nie hörbar.
+**Die Kulissen sind neu gebaut.** Der erste Ansatz — Rauschen durch einen
+breiten Bandpass — klang zwangsläufig nach Rauschen: ein Zischteppich mit
+konstantem Pegel und alle 20 bis 70 Sekunden ein Ereignis. Gemessen an der
+Schwankung des Kurzzeitpegels lag er bei **0,02 bis 0,04**; ein gleichmässiges
+Rauschen liegt bei 0,02.
+
+Jetzt wird jedes Klangbett einmal als Sample ausgerechnet (`js/kulisse.js`) und
+in Schleife gespielt. Darin stecken tausende Einzelereignisse:
+
+| Bett | Woraus es besteht | Schwankung |
+|---|---|---|
+| Regen | 420 Tropfen pro Sekunde plus dumpfe Aufschläge aufs Fensterbrett | 0,54 |
+| Wind | braunes Rauschen mit wandernder Klangfarbe, Böen, Blätterrascheln | 0,42 |
+| Wasser | 170 Wasserstösse pro Sekunde plus aufsteigende Blasen | 0,35 |
+| Raumton | sehr tiefes Grundrauschen, vereinzeltes Knacken im Gebälk | 0,34 |
+| Stimmen | Sprechrhythmus ohne Worte, Formanten statt Silben | 0,35 |
+| Grillen | sieben Tiere, jedes im eigenen Takt | 1,34 |
+
+Alles schreibt mit Modulo-Umbruch in den Puffer, damit die Schleifenstelle
+nahtlos ist. Die Betten mischen sich pro Ort (Schulhaus = Regen + Raum +
+ferne Stimmen, Waldrand = Wind + Grillen), und darüber liegen die Ereignisse,
+die man einzeln wiedererkennen soll: Schulhausglocke, Perrondurchsage,
+Zugdurchfahrt, Kirchenglocke, Velo, Specht, knackender Ast, Heizungsrohr.
+Deutlich häufiger als vorher — sonst hört man dazwischen nur den Grundton.
+
+`tools/audiotest.js` misst die Pegelschwankung jeder Kulisse im Browser mit und
+schlägt Alarm, wenn sie unter 0,12 fällt: dann wäre es wieder Rauschen.
+
 - **Titelmusik:** leichtes Detektiv-Thema mit gehender Bassfigur, Besen auf 2 und 4
   und einer Vibraphon-Melodie. Standardmässig **aus**, per Schalter einschaltbar.
 - **19 Effekte**, vom Kameraauslöser über Aktenschublade und Schritte bis zum

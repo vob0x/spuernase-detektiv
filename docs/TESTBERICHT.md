@@ -1,7 +1,7 @@
 # Testbericht
 
-Zwei automatisierte Suiten, beide über Playwright mit echtem Chromium,
-Bühne 1000 × 480 (Querformat), `deviceScaleFactor: 2`.
+Vier Prüfläufe: zwei im Browser über Playwright (Spiel und Ton), zwei in Python
+für die Sprache. Bühne 1000 × 480 (Querformat), `deviceScaleFactor: 2`.
 
 ## 1. Spiel — `node tools/test.js`
 
@@ -65,6 +65,16 @@ Kompressor hängt ein Analyser; gemessen wird der Spitzenpegel während der
 Wiedergabe. Geprüft werden alle 19 Effekte, alle sechs Klangkulissen, die
 Titelmusik und dass der Stummschalter wirklich stumm schaltet.
 
+Dazu die **Pegelschwankung jeder Kulisse**: gemessen wird, wie stark der
+Kurzzeitpegel über sechs Sekunden schwankt. Ein Rauschteppich liegt bei 0,02,
+eine Umgebung aus Ereignissen deutlich höher. Fällt ein Wert unter 0,12,
+schlägt der Test an — dann wäre die Kulisse wieder ein Zischen.
+
+```
+  ✓ schule    0.24    ✓ bahnhof   0.18    ✓ dorfplatz 0.15
+  ✓ museum    0.17    ✓ wald      0.33    ✓ buero     0.17
+```
+
 Für die Sprache zusätzlich: **alle 135 Dateien** werden abgerufen und auf
 Erreichbarkeit und Mindestgrösse geprüft, eine wird wirklich abgespielt
 (läuft die Wiedergabezeit?) und drei Stichproben werden auf plausible Länge
@@ -96,10 +106,61 @@ kontrolliert.
 ✓ Audio vollständig
 ```
 
+
+## 3. Aussprache — `python3 tools/aussprachetest.py`
+
+Lautet alle 135 Zeilen ein und prüft drei Dinge:
+
+- **Greift jeder Wörterbucheintrag?** Tote Einträge werden als solche gemeldet.
+- **Ist die falsche Lautfolge danach verschwunden?** Jeder Eintrag wird gezählt,
+  vorher und nachher.
+- **Kennt jede Stimme jeden Laut, den wir erzeugen?** Diese Prüfung fand den
+  Fehler, bei dem aus «ich» ein «ick» wurde.
+
+```
+  ✓  tsˈɛtnˈyːniː           -> tsnˈyːni             3x ersetzt
+  ✓  ɡuːˈɛtsliː             -> ɡˈuːtsli             2x ersetzt
+  ✓  rˈœstiː                -> rˈøːsti              6x ersetzt
+  ...
+Buchstabierte Wortanfänge:
+  vorher 2 Wörter betroffen (Znüni, Znüni-Kuchen), jetzt 0
+Lautbestand der Stimmen:
+  ✓ de_DE-thorsten-high: alle Laute vorhanden
+  ✓ de_DE-thorsten_emotional-medium: alle Laute vorhanden
+✓ Aussprachewörterbuch greift vollständig
+```
+
+## 4. Hörprobe — `python3 tools/hoerprobe.py`
+
+Ein Spracherkenner hört jede Aufnahme ab und vergleicht sie mit dem Text.
+Zahlen werden vorher vereinheitlicht, damit «24 cm» und «vierundzwanzig
+Zentimeter» als gleich gelten.
+
+| | vorher | nachher |
+|---|---|---|
+| alle Aufnahmen sauber verstanden | 93 von 135 | 102 von 135 |
+| **Figurenzeilen** | **5 von 27** | **21 von 27** |
+| Erzählerzeilen | 88 von 108 | 81 von 108 |
+
+Der Erzähler blieb unverändert (`thorsten-high`, keine Bearbeitung); die
+Schwankung dort ist der Erkenner, nicht die Sprache. Eine Gegenprobe mit einem
+grösseren Modell hat 14 der 27 auffälligen Erzählerzeilen als sauber bestätigt.
+Was übrig bleibt, sind Namen und Fremdwörter, die der Erkenner nicht kennt:
+Rüegg, Beeler, Egli, Znüni, Guetzli, Mountainbike.
+
+Das Werkzeug ist ein **Diagnose-Instrument, kein Qualitätsurteil**. Es findet
+grobe Fehler zuverlässig — buchstabierte Wörter, unverständliche Stimmen — und
+sagt nichts darüber, ob eine Stimme angenehm klingt.
+
 ## Was die Tests in dieser Runde gefunden haben
 
 | Fund | Ursache | Behoben |
 |---|---|---|
+| «Znüni» wurde «Zett-Nüni» | espeak kann /tsn/ am Wortanfang nicht bilden und liest das Z als Buchstabennamen | Korrektur direkt in der Lautschrift |
+| 81 % der Figurenzeilen unverständlich | Stimmenmodell `mls-medium` | ersetzt durch `thorsten_emotional`, Auswahl gemessen |
+| Stimmen klangen gepresst | `asetrate` verschiebt die Formanten mit | `rubberband` mit erhaltenen Formanten, keine Tempoänderung mehr |
+| «ich» klang wie «ick» | espeak liefert das ch als Kombinationszeichen, das kleine Stimmen nicht kennen | Lautschrift wird zusammengesetzt (NFC), Test prüft den Lautbestand |
+| Kulissen rauschten | Rauschen durch breiten Bandpass, Pegelschwankung 0,02 | Klangbetten aus Einzelereignissen, Schwankung 0,15–0,33 |
 | Eine Spur in Fall 2 nicht auffindbar | Marker lag hinter der Sprechzeile, die als Geschwisterelement die Zeigerereignisse schluckte | Sprechzeile klickdurchlässig, blendet am Tatort nach dem Vorlesen aus |
 | Phase «Zeugen» wurde übersprungen | Labor und Gegenüberstellung schalteten über Sprachende **und** Notfall-Timer weiter | `einmal()`: höchstens ein Wechsel, und nur solange der Bildschirm steht |
 | Tierfährten unsichtbar | SVG ohne `width`-Attribut, dazu `width: auto` | Container gibt die Breite vor |

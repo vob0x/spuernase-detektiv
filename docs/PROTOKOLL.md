@@ -131,6 +131,73 @@ Sprachausgabe soll nicht vom Gerät sein, wenn sie mechanisch klingt.»* →
   Testlauf hätte einen Totalausfall der Sprache nicht bemerkt. Alles neu als
   MP3: rund 800 KB grösser, dafür auf jedem Zielgerät und im Test überprüfbar.
 
+## Runde 4 — Aussprache und Kulisse
+
+Rückmeldung: *«Die Sprachqualität ist schlecht. Znüni wird als "Zett-Nüni"
+ausgesprochen. Zudem: Die Soundkulisse rauscht anstatt zu klingen.»*
+
+Beide Befunde waren richtig, und beide hatten eine tiefere Ursache als den
+genannten Einzelfall.
+
+### Was wirklich kaputt war
+
+Zuerst gemessen statt geraten. Neues Werkzeug `tools/hoerprobe.py`: ein
+Spracherkenner (faster-whisper) hört jede der 135 Aufnahmen ab und vergleicht
+sie mit dem Text, der gesprochen werden sollte.
+
+**Ergebnis des ersten Laufs: 93 von 135 Aufnahmen sauber verstanden.** Nach
+Rollen aufgeschlüsselt war das Bild eindeutig:
+
+| | Zeilen | auffällig |
+|---|---|---|
+| Erzähler (`thorsten-high`) | 108 | 20 (18 %) |
+| Figuren (`mls-medium`) | 27 | **22 (81 %)** |
+
+Aus «Ich mache jede Stunde eine Runde.» wurde «Wie soll das denn jetzt erwarten
+sein?». Das Problem war nicht ein Wort, sondern das Stimmenmodell.
+
+| # | Schritt | Was gemacht wurde |
+|---|---|---|
+| 30 | Aussprache diagnostiziert | Alle 491 Wörter der Spieltexte eingelautet und die Lautschrift durchgesehen. «Znüni» → `tsˈɛtnˈyːniː`: espeak liest das Z als Buchstabennamen, weil es /tsn/ am Wortanfang nicht bilden kann. Dazu 19 weitere Fehler: fehlendes h in «Forsthaus», fehlendes ch in «durchs», «ch» zu «k» in «erreichst», Notrufnummer 117 als «einhundertsiebzehn». |
+| 31 | Aussprachewörterbuch | `tools/aussprache.py` korrigiert auf Textebene (Notrufnummern ziffernweise) und auf Lautebene (direkt an den Phonemen). Ersatzschreibweisen wurden vorher durchprobiert und verworfen: «Tsnüni», «Snüni», «Z'nüni» und neun weitere wurden von espeak wieder buchstabiert oder klangen schlechter. |
+| 32 | Stimmen neu besetzt | 40 mls-Sprecher und alle Alternativen durchgemessen. `thorsten_emotional-medium` schlägt `mls-medium` deutlich (0,97 gegen 0,72). Neue Besetzung: Erzähler `thorsten-high`, alle Figuren `thorsten_emotional` in acht Färbungen mit Tonhöhenversatz. |
+| 33 | Tonhöhe und Tempo | `asetrate` (verschiebt die Formanten mit) ersetzt durch `rubberband` mit erhaltenen Formanten. Tempoänderungen ganz gestrichen: sie kosteten in jeder Messung Verständlichkeit. Kodierung von 48 kbit/s bei 24 kHz auf 64 kbit/s bei 22 kHz — das native Format des Modells statt einer sinnlosen Hochrechnung. |
+| 34 | Kulissen neu gebaut | `js/kulisse.js`: jedes Klangbett wird als Sample mit tausenden Einzelereignissen ausgerechnet und in Schleife gespielt, statt Rauschen durch einen Bandpass zu schicken. |
+| 35 | Neue Kulissen-Ereignisse | Schulhausglocke, Stuhlrücken, Perrondurchsage, Velo, Heizungsrohr, Specht, knackender Ast, Blättern — und alle Ereignisse deutlich häufiger. |
+| 36 | Zwei neue Prüfwerkzeuge | `tools/aussprachetest.py` (greift jeder Wörterbucheintrag, und kennt jede Stimme jeden Laut?) und die Pegelschwankungsmessung in `tools/audiotest.js`. |
+
+### Was dabei schiefging und wie es gefunden wurde
+
+- **Eine Korrektur war schlechter als der Fehler.** Für «Fingerabdrücke» hatte
+  ich `fˈɪŋɐʔapdrˌʏkə` eingetragen, weil espeaks `fˈɪŋeːrˌabdrʏkə` ein falsches
+  langes e hat. Die Gegenprobe: espeaks Fassung wird zu 1,00 verstanden, meine
+  zu 0,62. Eintrag gestrichen. Seither wird jeder Eintrag gegengeprüft.
+- **«ich» wurde zu «ick».** espeak liefert das ch in einem allein stehenden
+  «ich» als zwei Zeichen (c + Cedille) statt als ç. Stimmen mit kleinem
+  Lautbestand kennen das Kombinationszeichen nicht und werfen es weg. Jetzt
+  wird die Lautschrift vorher zusammengesetzt (Unicode-NFC), und der Test
+  prüft für jede Stimme, ob sie jeden erzeugten Laut kennt.
+- **Tonhöhe und Tempo zusammen zerstören die Stimme.** Einzeln waren −4 %
+  Tonhöhe und Tempo 0,95 je 1,00; zusammen 0,80. Deshalb gibt es jetzt gar
+  keine Tempoänderung mehr.
+- **Die weibliche Stimme war die schlechteste.** `eva_k` ist die einzige
+  weibliche deutsche Piper-Stimme, aber in der Qualitätsstufe x_low: 0,76
+  gegen 0,97. Ersetzt durch helle Färbungen des guten Sprechers. Das kostet
+  Vielfalt und ist der offenkundigste Kompromiss dieser Runde.
+- **Der Messwert sättigt.** Am Ende blieben 33 auffällige Zeilen. Eine
+  Gegenprobe mit einem grösseren Erkennungsmodell zeigte: 14 davon sind sauber
+  gesprochen, das kleine Modell kennt nur die Wörter nicht (Rüegg, Beeler,
+  Egli, Znüni, Guetzli, Mountainbike). Ab hier würde man den Spracherkenner
+  optimieren statt das Spiel.
+
+### Wo es steht
+
+| | vorher | nachher |
+|---|---|---|
+| Figurenzeilen sauber verstanden | 5 von 27 | 21 von 27 |
+| Pegelschwankung der Kulissen | 0,02–0,04 | 0,15–0,33 |
+| Buchstabierte Wörter | 2 | 0 |
+
 ## Stolpersteine beim Deployment
 
 - Der Container-Token darf keine neuen Repositories anlegen und nicht in sie
@@ -149,11 +216,15 @@ Sprachausgabe soll nicht vom Gerät sein, wenn sie mechanisch klingt.»* →
 
 - **Standarddeutsch, nicht Mundart.** Piper hat kein Schweizerdeutsch-Modell.
   Eine Mundartfassung bräuchte echte Sprecheraufnahmen.
-- **Die Stimmen sind synthetisch**, hörbar besser als eine Gerätestimme, aber
-  keine Schauspieler. Wer den nächsten Schritt will, spricht die 135 Zeilen
-  selbst ein: die Kennungen stehen in `js/voice-liste.js`, das Format ist
-  MP3 mono; sonst ändert sich nichts am Programm.
-- **2,2 MB Sprache** sind die grösste Einzelposition der App. Sie werden nach
+- **Alle Figuren sind derselbe Sprecher** in verschiedenen Färbungen. Für
+  Deutsch gibt es bei Piper keine zweite gute Stimme; die einzige weibliche ist
+  messbar schlechter. Wer echte Vielfalt will, spricht die 135 Zeilen selbst
+  ein: die Kennungen stehen in `js/voice-liste.js`, das Format ist MP3 mono;
+  sonst ändert sich nichts am Programm.
+- **«Znüni» bleibt schwierig.** Die Lautschrift ist jetzt richtig (/tsnyːni/),
+  aber die Lautfolge /tsn/ am Wortanfang liegt am Rand dessen, was das Modell
+  sauber bildet. Wer es ganz sicher haben will, benennt den Fall um.
+- **2,9 MB Sprache** sind die grösste Einzelposition der App. Sie werden nach
   der Installation im Hintergrund nachgeladen — der erste Start wartet nicht
   darauf, ein Fall ohne Netz beim allerersten Öffnen aber schon.
 - **Die Verhaftungswand ist oben leer.** Ohne Merkmalschips sind die Karten
