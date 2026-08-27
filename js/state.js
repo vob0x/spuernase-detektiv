@@ -10,7 +10,7 @@ const RAENGE = [
   { min: 13, name: 'Chefinspektor:in', icon: 'stempel' }
 ];
 
-const leer = () => ({ sterne: {}, ton: true, musik: false, gesehen: false });
+const leer = () => ({ sterne: {}, ton: true, musik: false, sprache: true, gesehen: false });
 
 let data = leer();
 
@@ -55,6 +55,7 @@ export function naechsterRang() {
 
 export function setTon(v) { data.ton = !!v; save(); }
 export function setMusikPref(v) { data.musik = !!v; save(); }
+export function setSprachePref(v) { data.sprache = !!v; save(); }
 export function setGesehen() { data.gesehen = true; save(); }
 
 export function reset() { data = leer(); save(); }

@@ -296,10 +296,20 @@ function anwenden() {
     return;
   }
   aktuelleKulisse = KULISSEN[gewuenscht]();
-  busAmb.gain.setTargetAtTime(0.9, ctx.currentTime, 0.9);
+  busAmb.gain.setTargetAtTime(geduckt ? 0.28 : 0.9, ctx.currentTime, 0.9);
 }
 
 export function kulisse(name) { gewuenscht = name; anwenden(); }
+
+/* Senkt Kulisse und Musik, solange gesprochen wird. */
+let geduckt = false;
+export function ducken(an) {
+  geduckt = !!an;
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  if (busAmb) busAmb.gain.setTargetAtTime(kulisseName ? (geduckt ? 0.28 : 0.9) : 0, t, 0.18);
+  if (busMusik) busMusik.gain.setTargetAtTime(musikAn ? (geduckt ? 0.16 : 0.55) : 0, t, 0.18);
+}
 
 /* ---------------- Musik ---------------- */
 /* Leichtes Detektiv-Thema: gehende Bassfigur, Besen auf 2 und 4,
@@ -397,6 +407,35 @@ export const sfx = {
   },
   rang() {
     [392, 523, 659, 784, 1047].forEach((f, i) => glocke({ f, t: i * 0.13, d: 1.9, vol: 0.2 }));
+  },
+  ausloeser() {                     /* Kameraverschluss */
+    rausch({ d: 0.03, vol: 0.34, f: 3200, q: 1.4, hell: true });
+    rausch({ t: 0.055, d: 0.05, vol: 0.26, f: 1800, q: 1.1, hell: true });
+    ton({ f: 150, t: 0.05, d: 0.06, typ: 'sine', vol: 0.16 });
+  },
+  akte() {                          /* Aktendeckel klappt auf */
+    rausch({ d: 0.3, vol: 0.2, f: 900, q: 0.5, hell: true, glide: 2600 });
+    ton({ f: 120, d: 0.18, typ: 'sine', vol: 0.2, glide: 80 });
+  },
+  zuschlag() {                      /* Akte zu */
+    rausch({ d: 0.14, vol: 0.3, f: 500, q: 0.6 });
+    ton({ f: 96, d: 0.2, typ: 'sine', vol: 0.34, glide: 62 });
+  },
+  whoosh() {
+    rausch({ d: 0.34, vol: 0.13, f: 700, q: 0.7, hell: true, glide: 3400 });
+  },
+  schritt(i = 0) {
+    rausch({ d: 0.09, vol: 0.16 + (i % 2) * 0.04, f: 320 + (i % 3) * 60, q: 1.4 });
+    rausch({ t: 0.015, d: 0.06, vol: 0.07, f: 1900, q: 1.2, hell: true });
+  },
+  tick() { rausch({ d: 0.02, vol: 0.16, f: 2800, q: 5, hell: true }); },
+  treffer() {
+    glocke({ f: 1046, d: 0.7, vol: 0.22 });
+    glocke({ f: 1568, t: 0.07, d: 0.55, vol: 0.13 });
+  },
+  aufdecken() {
+    rausch({ d: 0.22, vol: 0.1, f: 1600, q: 0.8, hell: true, glide: 4200 });
+    glocke({ f: 784, t: 0.05, d: 0.6, vol: 0.14 });
   }
 };
 

@@ -356,6 +356,10 @@ const ICONS = {
   fenster:       `<rect x="3.6" y="3.6" width="16.8" height="16.8" rx="1.4"/><path d="M12 3.6v16.8M3.6 12h16.8"/><path d="M3.6 20.4h16.8"/>`,
   velo:          `<circle cx="6" cy="16" r="4.2"/><circle cx="18" cy="16" r="4.2"/><path d="M6 16l4.2-8.2h4.6L18 16"/><path d="M8.8 7.8h4.4M10.2 16h4"/>`,
   lupe:          `<circle cx="10.6" cy="10.6" r="6.6"/><path d="M15.4 15.4 21 21"/>`,
+  uhr:           `<circle cx="12" cy="12" r="8.4"/><path d="M12 6.8V12l3.4 2.1"/><path d="M12 2.6v1.4M12 20v1.4M2.6 12H4M20 12h1.4"/>`,
+  lautsprecher:  `<path d="M4 9.4h3.4L12 5.4v13.2L7.4 14.6H4z"/><path d="M15.4 9.4a3.7 3.7 0 0 1 0 5.2"/><path d="M18 6.8a7.3 7.3 0 0 1 0 10.4"/>`,
+  pfeilLinks:    `<path d="M19 12H5.6"/><path d="M11.4 5.4 4.8 12l6.6 6.6"/>`,
+  pfeilRechts:   `<path d="M5 12h13.4"/><path d="M12.6 5.4 19.2 12l-6.6 6.6"/>`,
   stempel:       `<path d="M7 20.6h10M8.4 17.4h7.2l.8 3.2H7.6z"/><path d="M12 3.4c1.9 0 3 1.4 2.6 3.2l-.8 3.6h-3.6l-.8-3.6C9 4.8 10.1 3.4 12 3.4z"/><path d="M5.8 14.2h12.4v3.2H5.8z"/>`
 };
 
@@ -366,23 +370,80 @@ export function icon(name, stroke = '#c98a2b', w = 24) {
 }
 
 /* Tatortmarker: Sucher-Reticle mit Nummer, wie eine Beweismittelmarkierung */
-export function clueMarker(name, nr) {
+export function spurMarker(name, nr) {
   return `<svg xmlns="${NS}" viewBox="0 0 72 72" width="72" height="72" aria-hidden="true">
-    <circle class="clue__halo" cx="36" cy="36" r="31" fill="rgba(10,16,26,.30)"/>
-    <circle class="clue__ring" cx="36" cy="36" r="26" fill="none" stroke="#ffc55c"
-      stroke-width="2.6" stroke-dasharray="5 4"/>
-    <g class="clue__ecken" stroke="#ffc55c" stroke-width="2.6" stroke-linecap="round" fill="none">
+    <circle class="spur__halo" cx="36" cy="36" r="31" fill="rgba(10,16,26,.30)"/>
+    <circle class="spur__ring" cx="36" cy="36" r="26" fill="none" stroke="#ffc55c"
+      stroke-width="2.8" stroke-dasharray="5 4"/>
+    <g class="spur__ecken" stroke="#ffc55c" stroke-width="2.8" stroke-linecap="round" fill="none">
       <path d="M12 22 V14 a2 2 0 0 1 2-2 h8"/><path d="M60 22 V14 a2 2 0 0 0-2-2 h-8"/>
       <path d="M12 50 v8 a2 2 0 0 0 2 2 h8"/><path d="M60 50 v8 a2 2 0 0 1-2 2 h-8"/>
     </g>
-    <g transform="translate(24,24)" fill="none" stroke="#fff1d6"
-       stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <g transform="translate(23,23) scale(1.08)" fill="none" stroke="#fff1d6"
+       stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
       ${ICONS[name] || ICONS.zettel}
     </g>
-    ${nr ? `<g class="clue__nr"><circle cx="58" cy="14" r="9" fill="#c9451f" stroke="#fff1d6" stroke-width="1.6"/>
-      <text x="58" y="18" font-size="11" font-weight="800" fill="#fff1d6" text-anchor="middle"
+    ${nr ? `<g class="spur__nr"><circle cx="58" cy="14" r="9.5" fill="#c9451f" stroke="#fff1d6" stroke-width="1.7"/>
+      <text x="58" y="18.2" font-size="12" font-weight="800" fill="#fff1d6" text-anchor="middle"
         font-family="ui-rounded, system-ui, sans-serif">${nr}</text></g>` : ''}
   </svg>`;
+}
+
+/* Alter Name, damit nichts bricht, was noch clueMarker aufruft. */
+export const clueMarker = spurMarker;
+
+/* ============================ TIERSPUREN ============================ */
+/* Fall 5: welche Fährte gehört zum grossen Hund? Die vier Muster müssen sich
+   in Grösse, Zehenzahl und Gangbild klar unterscheiden — sonst ist es Raten. */
+
+function pfotenPfad(cx, cy, r, zehen, kralle) {
+  let d = `<ellipse cx="${cx}" cy="${(cy + r * 0.75).toFixed(1)}" rx="${(r * 1.05).toFixed(1)}" ry="${(r * 0.85).toFixed(1)}"/>`;
+  for (let i = 0; i < zehen; i++) {
+    const a = Math.PI * (1.18 + (i + 0.5) * (0.64 / zehen));
+    const x = cx + Math.cos(a) * r * 1.55;
+    const y = cy + r * 0.75 + Math.sin(a) * r * 1.55;
+    d += `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="${(r * 0.42).toFixed(1)}" ry="${(r * 0.55).toFixed(1)}"/>`;
+    if (kralle) d += `<path d="M${x.toFixed(1)} ${(y - r * 0.62).toFixed(1)} l0 ${(-r * 0.42).toFixed(1)}"
+      stroke="${TINTE}" stroke-width="${(r * 0.22).toFixed(1)}" stroke-linecap="round" fill="none"/>`;
+  }
+  return d;
+}
+
+export function tierspur(typ) {
+  const boden = `
+    <rect width="300" height="180" fill="#6a6152"/>
+    <rect width="300" height="180" fill="url(#tsk)"/>`;
+  const defs = `<defs><linearGradient id="tsk" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8a7f6a" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#4a4438" stop-opacity=".55"/></linearGradient></defs>`;
+
+  const spuren = {
+    /* grosser Hund: 4 Zehen, Krallen sichtbar, weite Schritte */
+    hundGross: { r: 13, zehen: 4, kralle: true,  pos: [[48, 118], [104, 62], [166, 118], [224, 62]] },
+    /* kleiner Hund: gleiche Form, halb so gross, enge Schritte */
+    hundKlein: { r: 7,  zehen: 4, kralle: true,  pos: [[44, 112], [80, 74], [118, 112], [156, 74], [196, 112], [234, 74]] },
+    /* Katze: 4 Zehen, keine Krallen, rundlich, kleine Schritte auf einer Linie */
+    katze:     { r: 8,  zehen: 4, kralle: false, pos: [[50, 96], [96, 84], [144, 96], [190, 84], [236, 96]] }
+  };
+
+  if (typ === 'vogel') {
+    const fuss = (x, y, s) => `
+      <g stroke="${TINTE}" stroke-width="${(2.6 * s).toFixed(1)}" stroke-linecap="round" fill="none" opacity=".85">
+        <path d="M${x} ${y} l0 ${(16 * s).toFixed(1)}"/>
+        <path d="M${x} ${y} l${(-13 * s).toFixed(1)} ${(-9 * s).toFixed(1)}"/>
+        <path d="M${x} ${y} l${(13 * s).toFixed(1)} ${(-9 * s).toFixed(1)}"/>
+      </g>`;
+    return svg('0 0 300 180', `${defs}${FILTER}${boden}
+      ${fuss(56, 108, 1)}${fuss(112, 78, 1)}${fuss(168, 108, 1)}${fuss(224, 78, 1)}
+      <rect width="300" height="180" filter="url(#korn)" fill="transparent"/>`, 'tierspur');
+  }
+
+  const t = spuren[typ] || spuren.hundGross;
+  const abdruecke = t.pos.map(([x, y], i) =>
+    `<g fill="${TINTE}" opacity="${(0.88 - i * 0.04).toFixed(2)}" filter="url(#weich)"
+        transform="rotate(${(i % 2 ? 8 : -8)} ${x} ${y})">${pfotenPfad(x, y, t.r, t.zehen, t.kralle)}</g>`).join('');
+  return svg('0 0 300 180', `${defs}${FILTER}${boden}${abdruecke}
+    <rect width="300" height="180" filter="url(#korn)" fill="transparent"/>`, 'tierspur');
 }
 
 /* ============================ NOTFALL-GESICHT ============================ */
