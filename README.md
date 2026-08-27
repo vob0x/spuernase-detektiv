@@ -44,11 +44,16 @@ am Ende flutet Blaulicht den Raum.
   Fasern, Handschriften, Uhr, Lineal, Tierfährten – wird prozedural als SVG
   erzeugt, damit Probe und richtige Antwort garantiert identisch aussehen
 - **Sprache:** 135 Aufnahmen, lokal mit Piper erzeugt (`de_DE-thorsten-high` für
-  den Erzähler, `de_DE-mls-medium` mit zehn Sprecher-Kennungen und
-  Tonhöhen-/Tempoversatz für 26 Figuren), MP3 48 kbit/s mono, ~2,2 MB
+  den Erzähler, `de_DE-thorsten_emotional-medium` in acht Färbungen für die
+  Figuren), MP3 64 kbit/s mono, ~2,9 MB. Die Besetzung ist gemessen, nicht
+  geraten: ein Spracherkenner hört jede Variante ab
+- **Aussprache:** eigenes Wörterbuch (`tools/aussprache.py`) korrigiert, was
+  espeak an Schweizer Wörtern verhaut — «Znüni» wurde sonst zu «Zett-Nüni»
 - **Ton:** Effekte, Kulissen und Musik vollständig über die WebAudio-API
-  synthetisiert. Drei Busse über gemeinsamen Hall und Kompressor, fünf
-  ortsbezogene Klangkulissen, optionale Titelmusik, 19 Effekte
+  synthetisiert. Die Klangbetten der Kulissen (`js/kulisse.js`) werden als
+  Sample mit tausenden Einzelereignissen ausgerechnet — Regen besteht aus
+  Tropfen, nicht aus gefiltertem Rauschen. Drei Busse über gemeinsamen Hall und
+  Kompressor, sechs Orte, optionale Titelmusik, 19 Effekte
 - Offline: Service Worker. Programm und Bilder im Precache, die Sprachdateien
   danach im Hintergrund
 - Fortschritt in `localStorage`, kein Konto, keine Datenübertragung, keine Werbung
@@ -64,6 +69,7 @@ js/app.js               Spiellogik und Bildschirme
 js/cases.js             die fünf Fallakten (reine Daten)
 js/art.js               SVG-Generatoren (Fingerabdrücke, Sohlen, Uhren, Marker)
 js/audio.js             Audio-Engine: Kulissen, Musik, Effekte
+js/kulisse.js           Klangbetten der Orte (Regen, Wind, Wasser, Stimmen)
 js/voice.js             Abspielen der Sprachaufnahmen
 js/voice-liste.js       erzeugte Liste aller Aufnahme-Kennungen
 js/state.js             Fortschritt, Ränge
@@ -80,7 +86,9 @@ docs/                   Konzept, Arbeitsprotokoll, Testbericht
 ```bash
 node tools/serve.js .        # http://localhost:8099
 node tools/test.js           # spielt alle fünf Fälle automatisch durch
-node tools/audiotest.js      # misst jeden Klang und prüft den Stummschalter
+node tools/audiotest.js      # misst jeden Klang, die Kulissen und den Stummschalter
+python3 tools/aussprachetest.py   # prüft das Aussprachewörterbuch
+python3 tools/hoerprobe.py        # hört jede Aufnahme ab und vergleicht mit dem Text
 ```
 
 `tools/preview.html` zeigt alle prozeduralen Beweismittel nebeneinander –
@@ -94,8 +102,11 @@ python3 tools/voice.py                 # nur geänderte Zeilen, per Hash-Sperre
 python3 tools/voice.py --nur f3        # nur einen Fall
 ```
 
-Braucht `piper` und `ffmpeg` sowie die Modelle unter `~/voices`. Das Werkzeug
-schreibt `js/voice-liste.js` mit; diese Liste wandert in den Service Worker.
+Braucht `piper`, `ffmpeg` (mit rubberband) und die Modelle unter `~/voices`.
+Das Werkzeug schreibt `js/voice-liste.js` mit; diese Liste wandert in den
+Service Worker. Wörter, die espeak falsch liest, kommen in
+`tools/aussprache.py` — und werden mit `tools/hoerprobe.py` gegengeprüft,
+denn nicht jede plausible Korrektur ist auch eine Verbesserung.
 
 ## Einen Fall ändern oder hinzufügen
 

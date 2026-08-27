@@ -1,6 +1,6 @@
 /* Service Worker – volles Precache, damit das Spiel offline läuft. */
 
-const VERSION = 'spuernase-v3';
+const VERSION = 'spuernase-v4';
 const ASSETS = [
   './',
   'index.html',
@@ -54,7 +54,7 @@ const ASSETS = [
   'assets/portraits/zaugg.webp'
 ];
 
-/* 135 Sprachaufnahmen (~2,2 MB). Werden im Hintergrund nachgeladen, damit die
+/* 135 Sprachaufnahmen (~2,9 MB). Werden im Hintergrund nachgeladen, damit die
    Installation nicht daran haengt. */
 const STIMMEN = [
   'assets/voice/f1-auf0.mp3',
