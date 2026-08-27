@@ -83,6 +83,54 @@ alle 27 Figuren als Illustration.
 - **Der Stempel war grau statt rot.** Der Graustufenfilter lag auf der ganzen
   Karte und damit auch auf dem Stempel. Jetzt liegt er nur auf dem Foto.
 
+## Runde 3 — Querformat, Bewegung, Vertonung
+
+Rückmeldung: *«Aktuell noch viel zu viel lesen, Fälle sehr uniform, Grafiken zu
+klein, alles in allem zu statisch. Alles Querformat. Animierte Sequenzen, mehr
+Ton, weniger Text.»* Und danach: *«Das Spiel braucht echte Atmosphäre. Die
+Sprachausgabe soll nicht vom Gerät sein, wenn sie mechanisch klingt.»* →
+**alles vertonen.**
+
+| # | Schritt | Was gemacht wurde |
+|---|---|---|
+| 21 | Feste Bühne | Alles auf 1000 × 480 Punkte umgestellt, als Ganzes skaliert. Ein Layout für alle Geräte, im Hochformat eine Drehaufforderung. Eine erzwungene Drehung ist nicht möglich: `screen.orientation.lock()` fehlt auf iOS-Safari. |
+| 22 | Phasen-Engine | Fälle bestimmen jetzt selbst, aus welchen Bildschirmen sie bestehen (`phasen`). Drei neue Phasenarten: Verfolgung, Zeitstrahl, Zeugen mit Sprechblasen. Fall 1 hat 4 Phasen, Fall 5 hat 6 — keine zwei Fälle laufen gleich. |
+| 23 | Text gekürzt | Jede Bildschirmzeile auf einen Satz gestutzt. Der Fliesstext ist ins Notizbuch gewandert, das jederzeit über den Kopfknopf erreichbar ist. |
+| 24 | Bewegung | Intro als Sequenz (Auslöser, fallendes Foto, Stempelknall, Fakten ticken einzeln herein), Spurenmarker fliegen ins Beweisregal, Sterne fliegen einzeln ein, Blaulicht bei der Verhaftung. |
+| 25 | Vertonung | 135 Zeilen mit Piper gesprochen. Erzähler `de_DE-thorsten-high`, 26 Figuren aus `de_DE-mls-medium` mit zehn Sprecher-Kennungen plus Tonhöhen- und Tempoversatz. ffmpeg: Hochpass, Lautheit auf −16 LUFS, MP3 48 kbit/s mono. |
+| 26 | Audio-Ducking | Kulisse und Musik senken ab, solange gesprochen wird. |
+| 27 | Neue Effekte | Kameraauslöser, Aktenschublade, Zuschlagen, Whoosh, Schritte, Ticken, Treffer, Aufdecken — die Effektliste ist von 11 auf 19 gewachsen. |
+| 28 | Tierfährten | Neuer SVG-Generator für Fall 5: grosser Hund, kleiner Hund, Katze, Vogel. Unterscheiden sich in Grösse, Zehenzahl, Krallen und Schrittweite, nicht bloss im Massstab. |
+| 29 | Testlauf umgebaut | `tools/test.js` spielt jetzt über die Phasen-Engine, prüft jede Phase einzeln, misst die Sterne und gleicht jede angeforderte Sprachaufnahme gegen die erzeugte Liste ab. `tools/audiotest.js` prüft zusätzlich alle 135 Dateien und misst drei Stichproben. |
+
+### Was dabei schiefging und wie es gefunden wurde
+
+- **Eine Spur liess sich nicht finden.** In Fall 2 lag ein Marker hinter der
+  Sprechzeile. Die Zeile ist ein Geschwisterelement der Szene und schluckte die
+  Zeigerereignisse — die Szene bekam nie ein `pointermove`. Zwei Korrekturen:
+  die Sprechzeile ist jetzt klickdurchlässig (nur der Hörknopf reagiert), und
+  am Tatort blendet sie nach dem Vorlesen aus.
+- **Eine Phase wurde übersprungen.** Labor und Gegenüberstellung schalteten
+  über zwei Wege weiter: das Sprachende **und** einen Notfall-Timer. Endete die
+  Aufnahme vor dem Timer, lief beides. Bei zwei Laboraufgaben sprang das Spiel
+  von Aufgabe 1 direkt an den Zeugen vorbei. Ersetzt durch `einmal()`: der
+  Wechsel läuft höchstens einmal und nur, solange der Bildschirm noch steht.
+- **Fährten waren unsichtbar.** Die SVG-Generatoren geben nur `viewBox` aus,
+  kein `width`/`height`. Mit `width: auto` fielen sie auf null zusammen. Die
+  Container geben jetzt die Breite vor.
+- **Dunkle Schrift auf dunklem Holz.** Vier Bildschirme setzten den Kopf auf
+  `kopf--dunkel`, obwohl dort die Schreibtischplatte liegt. Ebenso die Namen am
+  Zeitstrahl und die Faktenzeilen im Intro. Alle auf hell umgestellt.
+- **Sprechzeile über den Namen.** Bei Zeugen, Gegenüberstellung und Verhaftung
+  verdeckte die zentrierte Sprechzeile genau die Information, die verglichen
+  werden sollte. Die Frage der Gegenüberstellung steht jetzt in der
+  Beweiskarte; bei Zeugen und Verhaftung blendet die Zeile nach dem Vorlesen aus.
+- **AAC liess sich nicht prüfen.** Die erste Vertonung lag als m4a vor. Der
+  quelloffene Chromium-Bau, mit dem getestet wird, kann AAC nicht dekodieren
+  (`canPlayType('audio/mp4; codecs="mp4a.40.2"')` gibt leer zurück) — der
+  Testlauf hätte einen Totalausfall der Sprache nicht bemerkt. Alles neu als
+  MP3: rund 800 KB grösser, dafür auf jedem Zielgerät und im Test überprüfbar.
+
 ## Stolpersteine beim Deployment
 
 - Der Container-Token darf keine neuen Repositories anlegen und nicht in sie
@@ -99,8 +147,14 @@ alle 27 Figuren als Illustration.
 
 ## Offene Punkte
 
-- Verdächtigen- und Zeugengesichter sind prozedurale SVG-Vektorgesichter.
-  Sie sind konsistent und gut lesbar, wirken aber schlichter als die
-  KI-Hintergründe. Bei Bedarf durch generierte Porträts ersetzbar.
-- Der Text ist Standarddeutsch. Eine Mundart-Sprachausgabe wäre möglich,
-  bräuchte aber Audiodateien und damit einen anderen Grössen-Kompromiss.
+- **Standarddeutsch, nicht Mundart.** Piper hat kein Schweizerdeutsch-Modell.
+  Eine Mundartfassung bräuchte echte Sprecheraufnahmen.
+- **Die Stimmen sind synthetisch**, hörbar besser als eine Gerätestimme, aber
+  keine Schauspieler. Wer den nächsten Schritt will, spricht die 135 Zeilen
+  selbst ein: die Kennungen stehen in `js/voice-liste.js`, das Format ist
+  MP3 mono; sonst ändert sich nichts am Programm.
+- **2,2 MB Sprache** sind die grösste Einzelposition der App. Sie werden nach
+  der Installation im Hintergrund nachgeladen — der erste Start wartet nicht
+  darauf, ein Fall ohne Netz beim allerersten Öffnen aber schon.
+- **Die Verhaftungswand ist oben leer.** Ohne Merkmalschips sind die Karten
+  flacher als in der Gegenüberstellung. Funktioniert, wirkt aber luftig.

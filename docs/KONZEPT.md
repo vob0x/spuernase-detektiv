@@ -1,8 +1,9 @@
 # Spürnase — Detektivbüro Bärenmoos
 
 **Zielgruppe:** Kinder ab 8 Jahren (Schweiz, 2.–4. Klasse)
-**Plattform:** Progressive Web App, mobile-first, vollständig offline
+**Plattform:** Progressive Web App, **Querformat**, mobile-first, vollständig offline
 **Sprache:** Standarddeutsch, kurze Sätze, Schweizer Rechtschreibung (ss statt ß)
+**Vertonung:** jede Zeile ist gesprochen — 135 Aufnahmen, keine Gerätestimme
 
 ## Leitidee
 
@@ -10,49 +11,84 @@ Das Kind arbeitet im Detektivbüro der fiktiven Kleinstadt **Bärenmoos** und l�
 fünf Fälle. Kein Zeitdruck, keine Gewalt, keine Verlierer-Bildschirme. Wer falsch
 tippt, bekommt einen Hinweis und darf weiterarbeiten.
 
-## Warum das lehrreich ist (und nicht nur Klicken)
+Drei Regeln bestimmen jede Gestaltungsentscheidung:
 
-Jede Phase trainiert eine benannte Fähigkeit:
+1. **Zeigen statt beschreiben.** Was ein Bild oder eine Bewegung sagen kann,
+   steht nicht als Text da.
+2. **Hören statt lesen.** Jede Zeile wird vorgelesen; der Text daneben ist die
+   Absicherung, nicht der Hauptkanal.
+3. **Kein Fall spielt sich wie der vorherige.** Die Phasen sind pro Fall
+   unterschiedlich zusammengestellt.
+
+## Die Bühne
+
+Das Spiel läuft auf einer **festen Bühne von 1000 × 480 Punkten**, die als
+Ganzes auf den Bildschirm skaliert wird (`transform: scale`). Damit sitzt jedes
+Element auf jedem Gerät an derselben Stelle — kein Umbruch, keine
+Sonderfälle für kleine Bildschirme.
+
+Im Hochformat erscheint eine Sperre mit der Aufforderung, das Gerät zu drehen.
+Eine Zwangsdrehung wäre technisch nicht verlässlich: `screen.orientation.lock()`
+gibt es auf iOS-Safari nicht.
+
+## Phasen und ihre Zusammensetzung
+
+Es gibt sieben Phasenarten. Jeder Fall setzt sich aus einer eigenen Auswahl
+zusammen — das ist der Hebel gegen den Eindruck, alle Fälle seien gleich:
+
+| Fall | Phasen | Anzahl |
+|---|---|---|
+| 1 Der Znüni-Kuchen | Tatort → Labor → Gegenüberstellung → Verhaftung | 4 |
+| 2 Das gestohlene Velo | Tatort → Labor → **Verfolgung** → Gegenüberstellung → Verhaftung | 5 |
+| 3 Farbe am Gemeindehaus | Tatort → **Zeitstrahl** → **Zeugen** → Gegenüberstellung → Verhaftung | 5 |
+| 4 Das goldene Murmeltier | Tatort (**Taschenlampe**) → Labor → Zeugen → Gegenüberstellung → Verhaftung | 5 |
+| 5 Wo ist Rösti? | Tatort → Verfolgung → Labor → Zeugen → Gegenüberstellung → Verhaftung | 6 |
+
+Fall 1 ist bewusst kurz: vier Phasen, keine Zeugen, ein einziger Beweis in der
+Gegenüberstellung. Er ist das Tutorial und soll in wenigen Minuten durch sein.
 
 | Phase | Mechanik | Trainiert |
 |---|---|---|
-| 1 Tatort | Lupe über die Szene ziehen, Spuren finden | Gerichtete Aufmerksamkeit, systematisches Absuchen |
-| 2 Spurenlabor | Muster vergleichen, messen, umrechnen | Genaues Vergleichen, Grössen/Masse, Zahlenraum bis 100 |
-| 3 Zeugen | Aussagen lesen, Widerspruch zu gesichertem Fakt finden | Leseverständnis, Quellenkritik |
-| 4 Ausschluss | Beweis für Beweis Verdächtige eliminieren | Logisches Ausschlussverfahren, "wenn ... dann nicht ..." |
-| 5 Auflösung | Täter benennen, Begründung lesen | Schlussfolgern, Begründen |
+| Tatort | Lupe (oder Taschenlampe) über die Szene ziehen, Spuren aufdecken | Gerichtete Aufmerksamkeit, systematisches Absuchen |
+| Spurenlabor | Muster vergleichen, messen, umrechnen | Genaues Vergleichen, Grössen und Masse |
+| Verfolgung | An jeder Weggabelung die richtige Fährte wählen | Merkmale wiedererkennen, Entscheidungen begründen |
+| Zeitstrahl | Balken im Tatzeitfenster prüfen, Alibis ausschliessen | Zeitverständnis, Uhrzeiten lesen |
+| Zeugen | Aussagen anhören, den Widerspruch zum Fakt finden | Zuhören, Quellenkritik |
+| Gegenüberstellung | Beweis für Beweis Verdächtige ausschliessen | Logisches Ausschlussverfahren |
+| Verhaftung | Die übrig gebliebene Person benennen | Schlussfolgern |
 
 Dazu **Wusstest-du-Karten** mit Schweizer Sachwissen: Notruf 117,
 Kantonspolizei vs. Stadtpolizei, Velo-Codierung, Fundbüro, Spurensicherung.
 
-## Fortschritt
+## Bewegung
 
-Rangaufstieg: Anwärter:in -> Spürnase -> Wachtmeister:in -> Inspektor:in ->
-Chefinspektor:in. Pro Fall 1-3 Sterne, abhängig von Fehlversuchen.
-Fortschritt in `localStorage`, kein Konto, keine Datenübertragung.
+Kein Bildschirm erscheint einfach. Was animiert ist und warum:
 
-## Fälle
-
-1. **Der verschwundene Znüni-Kuchen** — Tutorial, Schulhaus
-2. **Das gestohlene Velo** — Bahnhof, Schuhgrösse + Reifenspur
-3. **Farbe am Gemeindehaus** — Uhrzeiten und Alibis
-4. **Das goldene Murmeltier** — Museum, 4 Verdächtige, Logikraster
-5. **Wo ist Rösti?** — Finale, alles kombiniert, versöhnliches Ende
+- **Fall-Intro:** Kameraauslöser → das Tatortfoto fällt auf den Tisch → der
+  Aktenstempel knallt darauf → Wachtmeister Brünnli spricht → die Fakten ticken
+  einzeln herein. Erst danach erscheint der Knopf zum Tatort.
+- **Tatort:** Wetterpartikel (Regen im Schulhaus, Staub im Museum), der
+  Marker pulsiert, wenn die Lupe nahe ist, und **fliegt beim Fund in das
+  Beweisregal** am rechten Rand.
+- **Sprechzeile:** blendet nach dem Vorlesen aus, damit sie keine Spur verdeckt,
+  und ist grundsätzlich klickdurchlässig — nur der Hörknopf reagiert.
+- **Gegenüberstellung:** Wer ausscheidet, sackt ab, wird grau und bekommt einen
+  «Raus»-Stempel quer über das Bild.
+- **Verhaftung:** Blaulicht flutet den Raum, Zweiklanghorn.
+- **Ergebnis:** Sterne fliegen einzeln herein, der Täterstempel knallt auf das
+  Passfoto, die drei Auflösungszeilen erscheinen im Takt des Vorlesens.
 
 ## Bildsprache
 
 Leitbild: **Akten auf einer Schreibtischplatte.** Der Hintergrund ist dunkles
-Holz mit Lampenlicht von oben, darauf liegen helle Papierflächen mit
-Aktenreitern. Alles Inhaltliche wirkt wie Material aus einer echten Fallakte:
+Holz mit Lampenlicht von oben, darauf liegen helle Papierflächen.
 
-- Tatorte sind **Fotos mit Fotoecken**, in die Mappe geklebt
-- Laborproben sind **Beweismittelkarten** auf Karton, mit Beschriftungsstreifen
-- Verdächtige sind **Passfotos**; wer ausscheidet, bekommt einen roten
-  Stempel «Ausgeschlossen» quer über das Bild
+- Tatorte sind **Fotos**, in die Mappe geklebt
+- Laborproben sind **Beweismittelkarten** auf Karton
+- Verdächtige sind **Passfotos** an einer Messwand
 - Spuren am Tatort sind **nummerierte Sucherrahmen** wie bei der Spurensicherung
-- Zeugenaussagen stehen auf Notizzetteln mit blauer Kante
 
-Farben: Papier (#f5efe1) und Tinte (#262b34) als Grundpaar, Messing für Aktionen,
+Farben: Papier (#f5efe1) und Tinte (#23272f) als Grundpaar, Messing für Aktionen,
 Polizeiblau für Fakten, Rot für Stempel und Widersprüche.
 
 ## Grafik: was gezeichnet und was generiert ist
@@ -61,18 +97,40 @@ Polizeiblau für Fakten, Rot für Stempel und Widersprüche.
 |---|---|---|
 | Tatorte, Titelbild | KI-Illustration, WebP ~75 KB | Atmosphäre, die Vektorgrafik nicht liefert |
 | 28 Figurenporträts | KI-Illustration, WebP ~10 KB | Wiedererkennbare Personen |
-| Fingerabdrücke, Sohlen, Reifen, Fasern, Handschrift, Uhr, Lineal | prozedurales SVG | Probe und richtige Antwort **müssen** identisch sein – das kann eine Bildgenerierung nicht zusichern |
+| Fingerabdrücke, Sohlen, Reifen, Fasern, Handschrift, Uhr, Lineal, Tierfährten | prozedurales SVG | Probe und richtige Antwort **müssen** identisch sein – das kann eine Bildgenerierung nicht zusichern |
 | Icons, Marker, Stempel | prozedurales SVG | beliebig einfärbbar, gestochen scharf |
 
 Die Fingerabdrücke folgen einem Strömungsfeld und bilden damit die echten
 Grundmuster ab: Bogen, Schleife, Wirbel, Doppelschleife. Die Uhr ist der
-Schweizer Bahnhofsuhr nachempfunden.
+Schweizer Bahnhofsuhr nachempfunden. Die Tierfährten unterscheiden sich in
+Grösse, Zehenzahl, Krallen und Schrittweite — nicht bloss im Massstab.
 
 ## Ton
 
-Vollständig synthetisiert über die WebAudio-API, keine einzige Audiodatei.
-Drei Busse (Musik, Kulisse, Effekte) laufen über einen gemeinsamen Hall
-(prozedural erzeugte Impulsantwort) und einen Kompressor.
+### Sprache
+
+135 Aufnahmen, erzeugt mit **Piper** (neuronales TTS, lokal) aus zwei deutschen
+Modellen:
+
+- **Wachtmeister Brünnli und alle Erklärtexte:** `de_DE-thorsten-high`
+- **26 Figuren:** `de_DE-mls-medium`, zehn verschiedene Sprecher-Kennungen,
+  jede Figur zusätzlich in Tonhöhe (0,97–1,16) und Tempo (0,95–1,04) verstellt.
+  Kinder klingen dadurch hörbar jünger als Erwachsene.
+
+Nachbearbeitung mit ffmpeg: Hochpass bei 70 Hz, Lautheitsangleich auf −16 LUFS,
+dann **MP3, 48 kbit/s, mono, 24 kHz**. Gesamt rund 2,2 MB.
+
+MP3 und nicht AAC: AAC fehlt in quelloffenen Chromium-Bauten und lässt sich
+darum in der Testumgebung nicht prüfen. MP3 spielt jedes Zielgerät ab.
+
+Während gesprochen wird, senkt `ducken()` Kulisse und Musik ab.
+Das Vorlesen ist abschaltbar; der Text bleibt dann sichtbar stehen.
+
+### Effekte und Kulisse
+
+Vollständig synthetisiert über die WebAudio-API. Drei Busse (Musik, Kulisse,
+Effekte) laufen über einen gemeinsamen Hall (prozedural erzeugte Impulsantwort)
+und einen Kompressor.
 
 - **Fünf ortsbezogene Klangkulissen:** Regen am Klassenfenster, Bahnhof mit
   Zugdurchfahrt und Perrongong, Dorfplatz mit Vögeln, Brunnen und Kirchenglocke,
@@ -81,13 +139,22 @@ Drei Busse (Musik, Kulisse, Effekte) laufen über einen gemeinsamen Hall
   dadurch wiederholt sie sich nie hörbar.
 - **Titelmusik:** leichtes Detektiv-Thema mit gehender Bassfigur, Besen auf 2 und 4
   und einer Vibraphon-Melodie. Standardmässig **aus**, per Schalter einschaltbar.
-- **Elf Effekte**, vom Papierrascheln bis zum Zweiklanghorn.
+- **19 Effekte**, vom Kameraauslöser über Aktenschublade und Schritte bis zum
+  Zweiklanghorn.
 
 Ton startet erst nach der ersten Berührung (Autoplay-Politik der Browser).
+
+## Fortschritt
+
+Rangaufstieg: Anwärter:in → Spürnase → Wachtmeister:in → Inspektor:in →
+Chefinspektor:in. Pro Fall 1–3 Sterne, abhängig von Fehlversuchen.
+Fortschritt in `localStorage`, kein Konto, keine Datenübertragung.
 
 ## Technische Entscheide
 
 - **Kein Framework, kein Build-Schritt.** Vanilla ES-Module. Wer das Spiel in
   fünf Jahren öffnet, braucht kein npm install.
-- **Offline:** Service Worker mit vollständigem Precache. Nach dem ersten
-  Laden funktioniert das Spiel im Flugmodus.
+- **Feste Bühne statt Media Queries.** Ein Layout, das überall gleich sitzt.
+- **Offline:** Service Worker. Programm und Bilder werden bei der Installation
+  geladen, die 135 Sprachdateien danach im Hintergrund in Achterwellen — so
+  hängt die Installation nicht an 2,2 MB Audio.
