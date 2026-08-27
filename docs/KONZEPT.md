@@ -141,6 +141,75 @@ verschiedenen Färbungen. Für Deutsch hat Piper keine zweite gute Stimme. Wer
 echte Vielfalt will, muss die 135 Zeilen von Menschen einsprechen lassen — die
 Kennungen stehen in `js/voice-liste.js`, am Programm ändert sich nichts.
 
+### Regie: warum jede Zeile anders gelesen wird
+
+Eine Stimme wirkt nicht monoton, weil ihr innerhalb eines Satzes die Melodie
+fehlt – die hat sie. Sie wirkt monoton, weil **alle Zeilen gleich gelesen
+werden**. Die erste vertonte Fassung war genau das: über 108 Erzählerzeilen
+gemessen unterschieden sich die Zeilen um 1,15 Halbtöne im Grundton und
+1,5 dB in der Lautheit. Vom Fallbeginn bis zur Verhaftung derselbe Tonfall.
+
+Das war ein selbstgemachter Fehler: die Stimmen wurden nach *Verständlichkeit*
+ausgewählt, und am leichtesten zu erkennen ist eine flache, gleichförmige
+Stimme. Tempoänderungen hatte ich aus demselben Grund ganz gestrichen.
+
+`tools/regie.py` gibt nun jeder Zeile eine Anweisung – Färbung, Tempo,
+Lautheit, Tonhöhe – abgeleitet aus dem, was gerade passiert:
+
+| Lage | Beispiel | Färbung | Tempo | Lautheit |
+|---|---|---|---|---|
+| ernst | Fallbeginn, Wusstest-du | neutral | langsam | leise |
+| fund | Spur gefunden | amüsiert | schnell | laut |
+| frage | Laborfrage, Gegenüberstellung | überrascht | normal | laut |
+| erklaerung | Begründung | neutral | langsam | mittel |
+| heimlich | dunkles Museum | schläfrig | sehr langsam | sehr leise |
+| draengend | Rösti bellt | überrascht | schnell | laut |
+| triumph | Fall gelöst, Beförderung | überrascht | schnell | am lautesten |
+| sanft | falsch geraten | schläfrig | langsam | leise |
+
+Dazu kommt ein kleiner, fester Versatz je Zeile, damit nicht alle Zeilen
+derselben Lage exakt gleich klingen. Er wird aus der Kennung berechnet – so
+klingt dieselbe Zeile bei jedem Neuaufbau gleich.
+
+**Eine Ausnahme:** Zeugenaussagen bekommen alle dieselbe Anweisung. Würde die
+Lüge anders klingen als die Wahrheit, wäre das Rätsel verraten.
+
+Was das bringt, gemessen mit `tools/lebendigkeit.py`:
+
+| | vorher | nachher |
+|---|---|---|
+| Tonumfang je Zeile | 3,15 Halbtöne | **3,64** |
+| Grundton-Unterschied zwischen den Zeilen | 1,15 Halbtöne | **2,86** |
+| Lautheits-Unterschied zwischen den Zeilen | 1,53 dB | **2,41** |
+| Hörprobe (verstanden) | 102 von 135 | 99 von 135 |
+
+Die drei Aufnahmen, die dabei verloren gehen, sind der Preis. Zu kräftige
+Anweisungen kosten mehr: mit Ausdrucksregler auf 1,0 statt der Modellvorgabe
+0,667 fiel die Hörprobe auf 89 von 135. Der Regler steht deshalb nahe der
+Vorgabe – die Abwechslung kommt aus Färbung, Tempo, Lautheit und Tonhöhe,
+und die kosten nichts.
+
+### Warum nicht eine ausdrucksstärkere Engine?
+
+Geprüft wurde XTTS-v2, das deutlich melodischer spricht. Über dieselben
+Zeilen gemessen: **Tonumfang 6,2 Halbtöne** gegen 3,6 bei Piper – hörbar
+lebendiger, und «Znüni» kann es von sich aus.
+
+Es scheitert an der Zuverlässigkeit. XTTS erfindet bei kurzen Eingaben Wörter,
+und drei von fünf Zeilen im Spiel sind kurz:
+
+> «Mira fährt Rennvelo. Aaron fährt Trottinett.»
+> → *«Mira ferdrenvelo. Aaron fert trottinetz ton blaorola. Desa alszona.»*
+
+Mit automatischer Rückprüfung und Neuwürfeln liessen sich 13 von 14 Zeilen
+sauber erzeugen – bei 36 % Wiederholungsrate, rund einer Stunde Rechenzeit für
+alle 135 Zeilen und einer Zeile, die auch nach drei Versuchen nicht sass. Für
+einen festen Bestand an Spieldateien ist das zu unsicher: eine still verdrehte
+Zeile fällt erst dem Kind auf.
+
+Dazu kommt: XTTS-v2 steht unter einer Lizenz, die nur nicht-kommerzielle
+Nutzung erlaubt.
+
 ### Aussprache
 
 espeak-ng, das Piper zum Einlauten benutzt, stolpert über Schweizer Wörter.
@@ -166,8 +235,9 @@ Vier Zeilen wurden stattdessen **umgeschrieben**, weil keine Lautkorrektur half:
 aus «Rösti bellt.» wurde «Hörst du Rösti?» — zwei Wörter mit Punkt geben dem
 Modell zu wenig Kontext.
 
-Nachbearbeitung mit ffmpeg: Hochpass bei 70 Hz, Lautheitsangleich auf −16 LUFS,
-dann **MP3, 64 kbit/s, mono, 22 kHz**. Gesamt rund 2,9 MB.
+Nachbearbeitung mit ffmpeg: Hochpass bei 70 Hz, Lautheitsangleich auf einen
+Zielwert **je nach Lage** (−13 dB im Jubel, −20 dB im dunklen Museum), dann
+**MP3, 64 kbit/s, mono, 22 kHz**. Gesamt rund 3,0 MB.
 
 Während gesprochen wird, senkt `ducken()` Kulisse und Musik ab.
 Das Vorlesen ist abschaltbar; der Text bleibt dann sichtbar stehen.

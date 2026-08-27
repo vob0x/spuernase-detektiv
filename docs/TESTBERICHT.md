@@ -1,7 +1,7 @@
 # Testbericht
 
-Vier Prüfläufe: zwei im Browser über Playwright (Spiel und Ton), zwei in Python
-für die Sprache. Bühne 1000 × 480 (Querformat), `deviceScaleFactor: 2`.
+Fünf Prüfläufe: zwei im Browser über Playwright (Spiel und Ton), drei in Python
+für die Sprache – Aussprache, Verständlichkeit und Lebendigkeit. Bühne 1000 × 480 (Querformat), `deviceScaleFactor: 2`.
 
 ## 1. Spiel — `node tools/test.js`
 
@@ -152,6 +152,52 @@ Das Werkzeug ist ein **Diagnose-Instrument, kein Qualitätsurteil**. Es findet
 grobe Fehler zuverlässig — buchstabierte Wörter, unverständliche Stimmen — und
 sagt nichts darüber, ob eine Stimme angenehm klingt.
 
+
+## 5. Lebendigkeit — `python3 tools/lebendigkeit.py`
+
+Die Hörprobe misst nur, ob man es versteht. Wer allein darauf optimiert, landet
+bei einer flachen Stimme – die ist am leichtesten zu erkennen. Dieses Werkzeug
+misst das Gegenstück, über eine Tonhöhenanalyse (Praat):
+
+- **Tonumfang** – Schwankung der Sprechmelodie in Halbtönen. Nüchternes
+  Vorlesen liegt bei 2 bis 3, lebendiges Erzählen bei 4 bis 7.
+- **Tonspanne** – Abstand zwischen oberem und unterem Zehntel.
+- **Rhythmus** – Schwankung der Silbenlänge.
+- **Abwechslung zwischen den Zeilen** – die entscheidende Grösse. Eine Stimme
+  kann in jedem Satz Melodie haben und trotzdem langweilen, wenn alle Zeilen
+  gleich hoch, gleich laut und gleich schnell gelesen werden.
+
+Der Lauf schlägt an, wenn der Tonumfang unter 2,6 Halbtöne fällt, eine Rolle
+unter 2,0 liegt, oder die Abwechslung zwischen den Zeilen unter 1,8 Halbtöne
+beziehungsweise 1,8 dB sinkt.
+
+### Letzter Lauf
+
+```
+Rolle           Zeilen  Tonumfang  Tonspanne  Rhythmus  Urteil
+erzaehler          108      3.64       9.21      0.43  lebendig
+odermatt             3      4.75       7.27      0.39  sehr lebendig
+...
+ALLE               135      3.64       8.80      0.42  lebendig
+
+Abwechslung zwischen den 108 Erzählerzeilen:
+  Grundton    2.86 Halbtöne
+  Tempo         20 %
+  Lautheit    2.41 dB
+```
+
+### Die beiden Messungen im Widerstreit
+
+Sie ziehen in entgegengesetzte Richtungen, und das ist beabsichtigt:
+
+| Ausdrucksregler | Hörprobe | Tonumfang |
+|---|---|---|
+| 0,667 (Modellvorgabe) | 102 von 135 | 3,15 |
+| 0,667–0,75 mit Regie | **99 von 135** | **3,64** |
+| 0,80–1,00 mit Regie | 89 von 135 | 3,90 |
+
+Die mittlere Zeile ist der gewählte Kompromiss.
+
 ## Was die Tests in dieser Runde gefunden haben
 
 | Fund | Ursache | Behoben |
@@ -161,6 +207,8 @@ sagt nichts darüber, ob eine Stimme angenehm klingt.
 | Stimmen klangen gepresst | `asetrate` verschiebt die Formanten mit | `rubberband` mit erhaltenen Formanten, keine Tempoänderung mehr |
 | «ich» klang wie «ick» | espeak liefert das ch als Kombinationszeichen, das kleine Stimmen nicht kennen | Lautschrift wird zusammengesetzt (NFC), Test prüft den Lautbestand |
 | Kulissen rauschten | Rauschen durch breiten Bandpass, Pegelschwankung 0,02 | Klangbetten aus Einzelereignissen, Schwankung 0,15–0,33 |
+| Stimme monoton | alle Zeilen gleich gelesen: 1,15 Halbtöne und 1,5 dB Unterschied zwischen 108 Zeilen | Regieanweisung je Zeile, jetzt 2,86 Halbtöne und 2,4 dB |
+| zu viel Ausdruck | `noise_scale` weit über der Modellvorgabe | zurück auf 0,667–0,75, gemessen gegen die Hörprobe |
 | Eine Spur in Fall 2 nicht auffindbar | Marker lag hinter der Sprechzeile, die als Geschwisterelement die Zeigerereignisse schluckte | Sprechzeile klickdurchlässig, blendet am Tatort nach dem Vorlesen aus |
 | Phase «Zeugen» wurde übersprungen | Labor und Gegenüberstellung schalteten über Sprachende **und** Notfall-Timer weiter | `einmal()`: höchstens ein Wechsel, und nur solange der Bildschirm steht |
 | Tierfährten unsichtbar | SVG ohne `width`-Attribut, dazu `width: auto` | Container gibt die Breite vor |

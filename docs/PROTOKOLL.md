@@ -198,6 +198,70 @@ sein?». Das Problem war nicht ein Wort, sondern das Stimmenmodell.
 | Pegelschwankung der Kulissen | 0,02–0,04 | 0,15–0,33 |
 | Buchstabierte Wörter | 2 | 0 |
 
+## Runde 5 — gegen die Monotonie
+
+Rückmeldung: *«Aussprache korrekt. Aber die Stimme ist langweilig und monoton.»*
+
+Berechtigt, und selbst verschuldet. In Runde 4 wurden die Stimmen nach
+Verständlichkeit ausgewählt – gemessen mit einem Spracherkenner. Am
+leichtesten zu erkennen ist aber genau eine flache, gleichförmige Stimme, und
+Tempoänderungen hatte ich aus demselben Grund komplett gestrichen. Die
+Messgrösse war für diese Frage die falsche.
+
+### Was die Zahlen zeigten
+
+Neues Werkzeug `tools/lebendigkeit.py` (Tonhöhenanalyse über Praat). Der
+Tonumfang *innerhalb* der Sätze war mit 3,15 Halbtönen gar nicht schlecht.
+Das Problem lag zwischen den Zeilen:
+
+| Über 108 Erzählerzeilen | vorher |
+|---|---|
+| Unterschied im Grundton | **1,15 Halbtöne** |
+| Unterschied in der Lautheit | **1,53 dB** |
+
+Jede Zeile gleich hoch, gleich laut, gleich schnell – vom Fallbeginn bis zur
+Verhaftung. Die Lautheit war sogar direkt mein Werk: `loudnorm=I=-16` auf
+jeder einzelnen Datei.
+
+| # | Schritt | Was gemacht wurde |
+|---|---|---|
+| 37 | Lebendigkeit messbar gemacht | `tools/lebendigkeit.py`: Tonumfang, Tonspanne, Rhythmus und – entscheidend – die Abwechslung zwischen den Zeilen. |
+| 38 | Regieanweisungen | `tools/regie.py` ordnet jeder Zeile eine Lage zu (ernst, fund, frage, triumph, heimlich, drängend, sanft …) und daraus Färbung, Tempo, Lautheit, Tonhöhe, Rhythmus und Ausdruck. |
+| 39 | Erzähler auf das Färbungsmodell | Nur so lässt sich der Tonfall je Situation wechseln. `thorsten-high` kann nur einen Tonfall. |
+| 40 | Lautheit nach Lage | Statt −16 dB für alles: −13 dB im Jubel, −20 dB im dunklen Museum. |
+| 41 | Ausdrucksregler eingemessen | `noise_scale` und `noise_w_scale` von Piper, vorher nie angefasst. |
+| 42 | Fremde Engine geprüft | XTTS-v2 gegen Piper gemessen – siehe unten. |
+
+### Was dabei schiefging und wie es gefunden wurde
+
+- **Zu viel Ausdruck kostet Verständlichkeit.** Mit dem Ausdrucksregler auf
+  0,8 bis 1,0 statt der Modellvorgabe 0,667 fiel die Hörprobe von 102 auf
+  **89 von 135**. Zurückgenommen auf 0,667 bis 0,75.
+- **Die lautesten Zeilen fielen zuerst durch.** Bei Tonhöhe +9 % und Tempo
+  0,88 wurden ausgerechnet die kurzen Rufe (Hundebellen, Jubel, Beförderung)
+  unverständlich. Auf +5 % und 0,93 zurückgenommen.
+- **XTTS-v2 ist melodischer, aber unzuverlässig.** Tonumfang 6,2 gegen 3,6
+  Halbtöne, und «Znüni» kann es ohne Wörterbuch. Aber es erfindet bei kurzen
+  Eingaben Wörter: aus «Mira fährt Rennvelo. Aaron fährt Trottinett.» wurde
+  «Mira ferdrenvelo. Aaron fert trottinetz ton blaorola. Desa alszona.» Mit
+  automatischer Rückprüfung und Neuwürfeln kam ich auf 13 von 14 sauberen
+  Zeilen bei 36 % Wiederholungsrate und rund einer Stunde Rechenzeit. Für
+  einen festen Dateibestand zu unsicher. Zusätzlich: Lizenz nur für
+  nicht-kommerzielle Nutzung.
+
+### Wo es steht
+
+| | vorher | nachher |
+|---|---|---|
+| Tonumfang je Zeile | 3,15 Halbtöne | **3,64** |
+| Grundton zwischen den Zeilen | 1,15 Halbtöne | **2,86** |
+| Lautheit zwischen den Zeilen | 1,53 dB | **2,41** |
+| Hörprobe | 102 von 135 | 99 von 135 |
+
+Drei Aufnahmen weniger sauber verstanden, dafür klingt das Spiel nicht mehr
+wie eine Bahnhofsdurchsage. Zwei Messungen halten sich jetzt gegenseitig in
+Schach: `hoerprobe.py` fragt, ob man es versteht, `lebendigkeit.py`, ob es lebt.
+
 ## Stolpersteine beim Deployment
 
 - Der Container-Token darf keine neuen Repositories anlegen und nicht in sie
@@ -216,6 +280,9 @@ sein?». Das Problem war nicht ein Wort, sondern das Stimmenmodell.
 
 - **Standarddeutsch, nicht Mundart.** Piper hat kein Schweizerdeutsch-Modell.
   Eine Mundartfassung bräuchte echte Sprecheraufnahmen.
+- **Die Grenze ist Piper.** Mehr Melodie geht mit diesem Modell nur auf Kosten
+  der Verständlichkeit. Wer eine wirklich lebendige Erzählstimme will, kommt um
+  eingesprochene Aufnahmen nicht herum.
 - **Alle Figuren sind derselbe Sprecher** in verschiedenen Färbungen. Für
   Deutsch gibt es bei Piper keine zweite gute Stimme; die einzige weibliche ist
   messbar schlechter. Wer echte Vielfalt will, spricht die 135 Zeilen selbst
@@ -224,7 +291,7 @@ sein?». Das Problem war nicht ein Wort, sondern das Stimmenmodell.
 - **«Znüni» bleibt schwierig.** Die Lautschrift ist jetzt richtig (/tsnyːni/),
   aber die Lautfolge /tsn/ am Wortanfang liegt am Rand dessen, was das Modell
   sauber bildet. Wer es ganz sicher haben will, benennt den Fall um.
-- **2,9 MB Sprache** sind die grösste Einzelposition der App. Sie werden nach
+- **3,0 MB Sprache** sind die grösste Einzelposition der App. Sie werden nach
   der Installation im Hintergrund nachgeladen — der erste Start wartet nicht
   darauf, ein Fall ohne Netz beim allerersten Öffnen aber schon.
 - **Die Verhaftungswand ist oben leer.** Ohne Merkmalschips sind die Karten
