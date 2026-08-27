@@ -43,6 +43,35 @@ const BASE = process.argv[2] || 'http://127.0.0.1:8099/';
     await messen(k, `A.kulisse(null); A.kulisse('${k}'); await new Promise(r=>setTimeout(r,1400));`, 2600);
   await page.evaluate(async () => { (await import('./js/audio.js')).kulisse(null); });
 
+  /* Rauschen oder Umgebung? Ein Zischteppich hat einen fast konstanten Pegel,
+     eine Umgebung besteht aus Ereignissen. Gemessen wird die Schwankung des
+     Kurzzeitpegels. Der alte Aufbau (Rauschen durch Bandpass) lag bei 0.02
+     bis 0.04 – alles darunter wäre ein Rückfall. */
+  console.log('  Bewegung in den Kulissen');
+  for (const k of ['schule', 'bahnhof', 'dorfplatz', 'museum', 'wald', 'buero']) {
+    const mod = await page.evaluate(async (name) => {
+      const A = await import('./js/audio.js');
+      A.unlock(); A.setSound(true);
+      A.kulisse(null); A.kulisse(name);
+      await new Promise(r => setTimeout(r, 2000));
+      const lies = A._pegel();
+      const werte = [];
+      const t0 = performance.now();
+      while (performance.now() - t0 < 6000) {
+        werte.push(lies());
+        await new Promise(r => setTimeout(r, 20));
+      }
+      const m = werte.reduce((a, b) => a + b, 0) / werte.length;
+      if (m < 1e-6) return 0;
+      const sd = Math.sqrt(werte.reduce((a, b) => a + (b - m) * (b - m), 0) / werte.length);
+      return sd / m;
+    }, k);
+    const ok = mod > 0.12;
+    console.log(`  ${ok ? '✓' : '✗'} ${k.padEnd(22)} Pegelschwankung ${mod.toFixed(2)}`);
+    if (!ok) fehler.push(k + ': Kulisse schwankt kaum (' + mod.toFixed(3) + ') – klingt nach Rauschen');
+  }
+  await page.evaluate(async () => { (await import('./js/audio.js')).kulisse(null); });
+
   console.log('  Musik');
   await messen('Titelmusik', `A.setMusik(true); await new Promise(r=>setTimeout(r,1500));`, 3000);
   await page.evaluate(async () => { (await import('./js/audio.js')).setMusik(false); });

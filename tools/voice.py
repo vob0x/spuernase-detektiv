@@ -1,49 +1,116 @@
 #!/usr/bin/env python3
 """Vertont alle Spieltexte mit Piper und legt sie als MP3 ab.
-Aufruf:  python3 tools/voice.py [--nur ID-Praefix]"""
-import json, os, subprocess, sys, hashlib
+
+Aufruf:  python3 tools/voice.py [--nur ID-PRAEFIX] [--neu]
+
+Warum es so gebaut ist, wie es gebaut ist:
+
+* **Aussprache.** espeak-ng, das Piper zum Einlauten benutzt, stolpert über
+  Schweizer Wörter. «Znüni» wurde zu «Zett-Nüni». Deshalb läuft jeder Text
+  durch tools/aussprache.py – erst über eine Textregel, dann über eine
+  Korrektur direkt in der Lautschrift. Geprüft von tools/aussprachetest.py.
+
+* **Stimmen.** Für Deutsch gibt es bei Piper genau eine wirklich gute Stimme
+  (thorsten-high) und eine brauchbare weibliche (eva_k). Das früher benutzte
+  Modell mls-medium hat 236 Sprecher, aber schlechte Qualität: im Hörtest
+  wurden 81 % der Figurenzeilen nicht mehr verstanden. Es ist ersetzt.
+
+* **Tonhöhe.** Verschiebungen laufen über rubberband mit erhaltenen Formanten.
+  Die alte Methode (asetrate) verschob die Formanten mit und klang gepresst;
+  im Messlauf fiel die Verständlichkeit dabei von 1,00 auf 0,88.
+
+Gemessen wird das Ergebnis mit tools/hoerprobe.py: ein Spracherkenner hört
+jede Aufnahme ab und vergleicht sie mit dem Text.
+"""
+import hashlib, json, os, subprocess, sys, wave
+
+import numpy as np
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from aussprache import text_vorbereiten, laute_korrigieren
 
 STIMMEN = "/home/claude/voices"
-THOR = f"{STIMMEN}/de_DE-thorsten-high.onnx"
-MLS  = f"{STIMMEN}/de_DE-mls-medium.onnx"
+HIGH = f"{STIMMEN}/de_DE-thorsten-high.onnx"           # männlich, beste Qualität
+EMO  = f"{STIMMEN}/de_DE-thorsten_emotional-medium.onnx"  # derselbe Sprecher, 8 Färbungen
+EVA  = f"{STIMMEN}/de_DE-eva_k-x_low.onnx"             # weiblich, x_low – ungenutzt
 ZIEL = "assets/voice"
 
-# Rolle -> (Modell, Sprecher-ID, Tonhoehe, Tempo)
+# Färbungen des emotional-Modells
+AMUSED, ANGRY, DISGUSTED, DRUNK, NEUTRAL, SLEEPY, SURPRISED, WHISPER = range(8)
+
+# Rolle -> (Modell, Sprecher, Tonhöhe)
+#
+# Ausgewählt mit einem Messlauf: derselbe Satz durch jede Einstellung, danach
+# von einem Spracherkenner abgehört. Über fünf kurze Zeugensätze gemittelt:
+#
+#   emo amused +12 %  0,97      high roh          0,82
+#   emo surprised     0,93      eva_k +/- 4 %     0,76
+#   emo neutral       0,92      eva_k roh         0,76
+#   emo sleepy        0,91      eva_k Tempo 0,95  0,70
+#   high  -6 %        0,89      mls-medium        0,72
+#
+# Daraus drei Regeln:
+#   * eva_k (Qualitätsstufe x_low) trägt keine Rolle mehr – zu unsauber.
+#   * Tempoänderungen kosten immer Verständlichkeit und entfallen ganz.
+#   * Tonhöhe nur über rubberband mit erhaltenen Formanten, höchstens 18 %.
+#
+# Die Figuren klingen damit alle nach demselben Sprecher in verschiedenen
+# Färbungen. Für Deutsch gibt es bei Piper keine zweite gute Stimme; wer echte
+# Vielfalt will, muss die 135 Zeilen von Menschen einsprechen lassen.
 CAST = {
-    'erzaehler':  (THOR, None, 1.00, 1.00),
-    'zaugg':      (MLS,   22, 1.00, 1.00),
-    'livia':      (MLS,   15, 1.12, 1.00),
-    'ruben':      (MLS,  140, 1.16, 1.02),
-    'nora':       (MLS,  120, 1.10, 1.00),
-    'baertschi':  (MLS,   31, 1.00, 0.98),
-    'steiner':    (MLS,   55, 1.00, 1.00),
-    'selina':     (MLS,   15, 1.08, 1.00),
-    'timo':       (MLS,  140, 1.12, 1.02),
-    'mira':       (MLS,   40, 1.06, 1.00),
-    'aaron':      (MLS,   70, 1.12, 1.02),
-    'nina':       (MLS,  120, 1.04, 1.00),
-    'odermatt':   (MLS,   40, 1.00, 1.00),
-    'kevin':      (MLS,   70, 1.04, 1.00),
-    'frei':       (MLS,   88, 1.00, 0.98),
-    'jill':       (MLS,   15, 1.00, 1.00),
-    'dario':      (MLS,  140, 1.06, 1.00),
-    'enia':       (MLS,  120, 1.00, 1.00),
-    'rueegg':     (MLS,   31, 1.00, 1.00),
-    'kunz':       (MLS,  101, 1.00, 0.98),
-    'beeler':     (MLS,   40, 1.00, 1.00),
-    'ammann':     (MLS,   22, 1.00, 1.00),
-    'huebscher':  (MLS,   31, 0.97, 0.95),
-    'luis':       (MLS,   70, 1.00, 1.04),
-    'sutter':     (MLS,   88, 1.00, 0.97),
-    'egli':       (MLS,  120, 1.00, 1.00),
+    'erzaehler':  (HIGH, None,      1.00),   # Wachtmeister Brünnli und alle Erklärtexte
+
+    # Frauen – helle Färbung, unterschiedlich hoch
+    'odermatt':   (EMO,  AMUSED,    1.08),
+    'rueegg':     (EMO,  AMUSED,    1.10),
+    'beeler':     (EMO,  AMUSED,    1.12),
+    'huebscher':  (EMO,  AMUSED,    1.06),
+    'egli':       (EMO,  AMUSED,    1.13),
+    'nina':       (EMO,  AMUSED,    1.11),
+    'jill':       (EMO,  AMUSED,    1.15),
+    'enia':       (EMO,  AMUSED,    1.09),
+    'nora':       (EMO,  AMUSED,    1.14),
+    'livia':      (EMO,  AMUSED,    1.16),
+    'selina':     (EMO,  AMUSED,    1.12),
+    'mira':       (EMO,  AMUSED,    1.07),
+    'baertschi':  (EMO,  NEUTRAL,   1.05),
+    'steiner':    (EMO,  SURPRISED, 1.04),
+    'ammann':     (EMO,  NEUTRAL,   1.02),
+
+    # Männer – dunkler, über Färbung unterschieden
+    'kunz':       (HIGH, None,      0.94),
+    'sutter':     (EMO,  SLEEPY,    0.96),
+    'frei':       (EMO,  NEUTRAL,   0.97),
+    'zaugg':      (EMO,  SURPRISED, 0.98),
+
+    # Kinder – höchste geprüfte Anhebung
+    'kevin':      (EMO,  AMUSED,    1.17),
+    'luis':       (EMO,  AMUSED,    1.18),
+    'ruben':      (EMO,  AMUSED,    1.16),
+    'timo':       (EMO,  AMUSED,    1.18),
+    'dario':      (EMO,  AMUSED,    1.15),
+    'aaron':      (EMO,  AMUSED,    1.17),
 }
 
+
+def faelle_lesen():
+    """Die Fallakten aus js/cases.js holen – ohne Umweg über eine Datei,
+    die jemand von Hand aktuell halten müsste."""
+    js = ("import('./js/cases.js').then(m => "
+          "console.log(JSON.stringify(m.FAELLE)))")
+    out = subprocess.run(['node', '--input-type=module', '-e', js],
+                         capture_output=True, cwd=os.getcwd(), check=True)
+    return json.loads(out.stdout.decode('utf-8'))
+
+
 def zeilen():
-    faelle = json.load(open('/tmp/cases.json'))
+    faelle = faelle_lesen()
     L = []
+
     def add(i, t, r='erzaehler'):
         t = ' '.join(str(t).split())
-        if t: L.append((i, t, r))
+        if t:
+            L.append((i, t, r))
 
     for f in faelle:
         p = f['id']
@@ -85,10 +152,10 @@ def zeilen():
         'g-verhaftet': 'Fall gelöst. Sehr gute Arbeit.',
         'g-drei': 'Drei Sterne. Kein einziger Fehler.',
         'g-befoerdert': 'Du wirst befördert.',
-        'g-hinweis-oben': 'Rösti bellt. Schau weiter oben.',
-        'g-hinweis-unten': 'Rösti bellt. Schau weiter unten.',
-        'g-hinweis-links': 'Rösti bellt. Schau nach links.',
-        'g-hinweis-rechts': 'Rösti bellt. Schau nach rechts.',
+        'g-hinweis-oben': 'Hörst du Rösti? Schau weiter oben.',
+        'g-hinweis-unten': 'Hörst du Rösti? Schau weiter unten.',
+        'g-hinweis-links': 'Hörst du Rösti? Schau nach links.',
+        'g-hinweis-rechts': 'Hörst du Rösti? Schau nach rechts.',
         'g-zeuge': 'Eine Aussage kann nicht stimmen. Welche?',
         'g-erwischt': 'Erwischt.',
         'g-weiter': 'Weiter geht es.',
@@ -97,50 +164,103 @@ def zeilen():
         add(i, t)
     return L
 
-def bauen(nur=None):
+
+# ------------------------------------------------------------ Synthese
+
+_modelle = {}
+
+
+def modell(pfad):
+    if pfad not in _modelle:
+        from piper import PiperVoice
+        _modelle[pfad] = PiperVoice.load(pfad)
+    return _modelle[pfad]
+
+
+def sprechen(V, text, sprecher):
+    """Text einlauten, Aussprache korrigieren, Audio erzeugen."""
+    from piper import SynthesisConfig
+    cfg = SynthesisConfig(normalize_audio=True)
+    if sprecher is not None:
+        cfg = SynthesisConfig(speaker_id=sprecher, normalize_audio=True)
+
+    saetze = V.phonemize(text_vorbereiten(text))
+    stuecke = []
+    for laute in saetze:
+        laute = list(laute_korrigieren(''.join(laute)))
+        if not laute:
+            continue
+        ids = V.phonemes_to_ids(laute)
+        a = V.phoneme_ids_to_audio(ids, cfg)
+        if isinstance(a, tuple):
+            a = a[0]
+        stuecke.append(np.asarray(a, dtype=np.float32))
+        stuecke.append(np.zeros(int(V.config.sample_rate * 0.12), dtype=np.float32))
+    if not stuecke:
+        return np.zeros(1, dtype=np.float32)
+    return np.concatenate(stuecke)
+
+
+def wav_schreiben(pfad, audio, rate):
+    x = np.clip(audio, -1, 1)
+    if np.max(np.abs(x)) > 1e-6:
+        x = x / np.max(np.abs(x)) * 0.97
+    with wave.open(pfad, 'w') as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(rate)
+        w.writeframes((x * 32767).astype(np.int16).tobytes())
+
+
+def bauen(nur=None, alles_neu=False):
     os.makedirs(ZIEL, exist_ok=True)
     L = zeilen()
     if nur:
         L = [x for x in L if x[0].startswith(nur)]
+
     stand = {}
-    if os.path.exists('tools/voice.lock'):
-        stand = json.load(open('tools/voice.lock'))
+    sperre = 'tools/voice.lock'
+    if os.path.exists(sperre) and not alles_neu:
+        stand = json.load(open(sperre))
+
     neu = 0
-    for i, (vid, text, rolle) in enumerate(L):
-        modell, spk, hoehe, tempo = CAST.get(rolle, CAST['erzaehler'])
-        sig = hashlib.sha1(f"{text}|{rolle}|{modell}|{spk}|{hoehe}|{tempo}".encode()).hexdigest()[:12]
+    for vid, text, rolle in L:
+        mod, spk, hoehe = CAST.get(rolle, CAST['erzaehler'])
+        sig = hashlib.sha1(
+            f"{text}|{rolle}|{mod}|{spk}|{hoehe}|v6".encode()).hexdigest()[:12]
         ziel = f"{ZIEL}/{vid}.mp3"
         if stand.get(vid) == sig and os.path.exists(ziel):
             continue
-        cmd = ['piper', '-m', modell, '-f', '/tmp/_v.wav']
-        if spk is not None:
-            cmd += ['-s', str(spk)]
-        subprocess.run(cmd, input=text.encode(), stdout=subprocess.DEVNULL,
-                       stderr=subprocess.DEVNULL, check=True)
+
+        V = modell(mod)
+        audio = sprechen(V, text, spk)
+        wav_schreiben('/tmp/_v.wav', audio, V.config.sample_rate)
+
         af = []
         if abs(hoehe - 1.0) > 0.001:
-            af.append(f"asetrate=22050*{hoehe},aresample=22050,atempo={round(1/hoehe,4)}")
-        if abs(tempo - 1.0) > 0.001:
-            af.append(f"atempo={tempo}")
+            # Formanten bleiben stehen: die Stimme wird höher, nicht gepresst.
+            af.append(f"rubberband=pitch={hoehe:.4f}:formant=preserved")
         af.append("highpass=f=70,loudnorm=I=-16:TP=-1.5:LRA=11")
-        # MP3, nicht AAC: MP3 spielt jedes Ziel-Geraet und jeder Browser ab,
-        # AAC fehlt in quelloffenen Chromium-Builds und laesst sich hier nicht pruefen.
+
         subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', '/tmp/_v.wav',
-                        '-af', ','.join(af), '-c:a', 'libmp3lame', '-b:a', '48k',
-                        '-ar', '24000', '-ac', '1', ziel], check=True)
+                        '-af', ','.join(af), '-c:a', 'libmp3lame', '-b:a', '64k',
+                        '-ar', '22050', '-ac', '1', ziel], check=True)
         stand[vid] = sig
         neu += 1
         if neu % 15 == 0:
             print(f"  {neu} vertont ...", flush=True)
-    json.dump(stand, open('tools/voice.lock', 'w'), indent=0)
+
+    json.dump(stand, open(sperre, 'w'), indent=0)
 
     ids = sorted(x[0] for x in zeilen())
     with open('js/voice-liste.js', 'w', encoding='utf-8') as fh:
         fh.write("/* Erzeugt von tools/voice.py. Nicht von Hand ändern. */\n")
         fh.write("export const STIMMEN = " + json.dumps(ids, ensure_ascii=False, indent=0) + ";\n")
     groesse = sum(os.path.getsize(f"{ZIEL}/{x}") for x in os.listdir(ZIEL))
-    print(f"fertig: {len(ids)} Aufnahmen, {neu} neu, {groesse//1024} KB gesamt")
+    print(f"fertig: {len(ids)} Aufnahmen, {neu} neu, {groesse // 1024} KB gesamt")
+
 
 if __name__ == '__main__':
-    nur = sys.argv[2] if len(sys.argv) > 2 and sys.argv[1] == '--nur' else None
-    bauen(nur)
+    a = sys.argv[1:]
+    nur = a[a.index('--nur') + 1] if '--nur' in a else None
+    bauen(nur, alles_neu='--neu' in a)
