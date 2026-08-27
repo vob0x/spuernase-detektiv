@@ -1,6 +1,6 @@
 /* Service Worker – volles Precache, damit das Spiel offline läuft. */
 
-const VERSION = 'spuernase-v5';
+const VERSION = 'spuernase-v6';
 const ASSETS = [
   './',
   'index.html',
@@ -54,8 +54,9 @@ const ASSETS = [
   'assets/portraits/zaugg.webp'
 ];
 
-/* 135 Sprachaufnahmen (~3,0 MB). Werden im Hintergrund nachgeladen, damit die
-   Installation nicht daran haengt. */
+/* 135 Sprachaufnahmen (~4,9 MB). Seit dem Wechsel auf Gemini TTS sind sie
+   laenger – im Schnitt 4,65 statt 2,86 Sekunden – und damit rund 60 % groesser.
+   Werden im Hintergrund nachgeladen, damit die Installation nicht daran haengt. */
 const STIMMEN = [
   'assets/voice/f1-auf0.mp3',
   'assets/voice/f1-auf1.mp3',

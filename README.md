@@ -43,15 +43,19 @@ am Ende flutet Blaulicht den Raum.
   gesamt); alles Beweiserhebliche – Fingerabdrücke, Sohlen, Reifenprofile,
   Fasern, Handschriften, Uhr, Lineal, Tierfährten – wird prozedural als SVG
   erzeugt, damit Probe und richtige Antwort garantiert identisch aussehen
-- **Sprache:** 135 Aufnahmen, lokal mit Piper erzeugt (`de_DE-thorsten-high` für
-  den Erzähler, `de_DE-thorsten_emotional-medium` in acht Färbungen für die
-  Figuren), MP3 64 kbit/s mono, ~2,9 MB. Die Besetzung ist gemessen, nicht
-  geraten: ein Spracherkenner hört jede Variante ab
-- **Aussprache:** eigenes Wörterbuch (`tools/aussprache.py`) korrigiert, was
-  espeak an Schweizer Wörtern verhaut — «Znüni» wurde sonst zu «Zett-Nüni»
-- **Regie:** jede Zeile bekommt aus `tools/regie.py` eine Anweisung — Färbung,
-  Tempo, Lautheit, Tonhöhe je nach Lage. «Fall gelöst» klingt anders als «Es ist
-  dunkel». Ohne das lesen sich alle 135 Zeilen gleich
+- **Sprache:** 135 Aufnahmen, erzeugt mit **Gemini 3.1 Flash TTS**, MP3
+  64 kbit/s mono, ~4,9 MB. Jede sprechende Rolle hat eine eigene Stimme, und
+  die Besetzung ist **gemessen, nicht geraten**: alle 30 Stimmen einmal durch
+  denselben Satz, dann Grundton **und Formanten** gemessen — die Namen verraten
+  das Geschlecht nicht («Puck» klingt nach Kobold und ist ein Mann)
+- **Regie:** jede Zeile bekommt aus `tools/regie.py` eine Anweisung, formuliert
+  wie für eine Sprecherin im Studio: «Leise und geheimnisvoll, fast geflüstert»
+  gegen «Triumphierend und stolz, der Fall ist gelöst». Ohne das lesen sich alle
+  135 Zeilen gleich. Zeugenaussagen bekommen bewusst **alle dieselbe**
+  Anweisung — sonst verriete der Tonfall die Lüge
+- **Prüfung:** jede frische Aufnahme wird sofort von einem Spracherkenner
+  abgehört. Spricht das Modell die Regieanweisung mit oder nuschelt es, wird die
+  Zeile wiederholt und der **beste** Versuch behalten
 - **Ton:** Effekte, Kulissen und Musik vollständig über die WebAudio-API
   synthetisiert. Die Klangbetten der Kulissen (`js/kulisse.js`) werden als
   Sample mit tausenden Einzelereignissen ausgerechnet — Regen besteht aus
@@ -81,8 +85,9 @@ assets/portraits/       28 Figurenporträts
 assets/voice/           135 Sprachaufnahmen (MP3)
 assets/icons/           App-Icons
 tools/                  Entwicklungswerkzeuge (nicht Teil der App)
-  regie.py              Tonfall je Zeile: Färbung, Tempo, Lautheit, Tonhöhe
-  aussprache.py         Wörterbuch für das, was espeak falsch liest
+  regie.py              Regieanweisung und Stimmenbesetzung je Zeile
+  regietest.py          prüft die Regie, bevor 135 Aufrufe ans Modell gehen
+  aussprache.py         Lautschrift-Wörterbuch aus der Piper-Zeit, ungenutzt
 docs/                   Konzept, Arbeitsprotokoll, Testbericht
 ```
 
@@ -92,7 +97,7 @@ docs/                   Konzept, Arbeitsprotokoll, Testbericht
 node tools/serve.js .        # http://localhost:8099
 node tools/test.js           # spielt alle fünf Fälle automatisch durch
 node tools/audiotest.js      # misst jeden Klang, die Kulissen und den Stummschalter
-python3 tools/aussprachetest.py   # prüft das Aussprachewörterbuch
+python3 tools/regietest.py        # prüft Regie, Besetzung und Schreibregeln
 python3 tools/hoerprobe.py        # hört jede Aufnahme ab und vergleicht mit dem Text
 python3 tools/lebendigkeit.py     # misst Sprechmelodie und Abwechslung
 ```
@@ -111,11 +116,14 @@ python3 tools/voice.py                 # nur geänderte Zeilen, per Hash-Sperre
 python3 tools/voice.py --nur f3        # nur einen Fall
 ```
 
-Braucht `piper`, `ffmpeg` (mit rubberband) und die Modelle unter `~/voices`.
+Braucht `ffmpeg`, `faster-whisper` und einen Gemini-API-Schlüssel in der Datei,
+auf die `GEMINI_KEY` zeigt (Vorgabe `/tmp/.gk`). Der Schlüssel steht nirgends im
+Projekt. Ein vollständiger Neubau kostet rund 0,19 USD.
+
 Das Werkzeug schreibt `js/voice-liste.js` mit; diese Liste wandert in den
-Service Worker. Wörter, die espeak falsch liest, kommen in
-`tools/aussprache.py` — und werden mit `tools/hoerprobe.py` gegengeprüft,
-denn nicht jede plausible Korrektur ist auch eine Verbesserung.
+Service Worker. Wörter, die das Modell falsch liest, kommen als Schreibregel in
+`regie.LAUTSCHREIBUNG` — sie ändern nur den gesprochenen Text, nie den auf dem
+Bildschirm, und jeder Eintrag wird gemessen statt geraten.
 
 ## Einen Fall ändern oder hinzufügen
 
