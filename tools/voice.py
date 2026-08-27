@@ -1,106 +1,190 @@
 #!/usr/bin/env python3
-"""Vertont alle Spieltexte mit Piper und legt sie als MP3 ab.
+"""Vertont alle Spieltexte mit Gemini TTS und legt sie als MP3 ab.
 
 Aufruf:  python3 tools/voice.py [--nur ID-PRAEFIX] [--neu]
+Braucht einen Gemini-API-Schlüssel in der Datei, auf die GEMINI_KEY zeigt
+(Vorgabe /tmp/.gk). Der Schlüssel steht nirgends im Projekt.
 
-Warum es so gebaut ist, wie es gebaut ist:
+Warum Gemini und nicht mehr Piper:
 
-* **Aussprache.** espeak-ng, das Piper zum Einlauten benutzt, stolpert über
-  Schweizer Wörter. «Znüni» wurde zu «Zett-Nüni». Deshalb läuft jeder Text
-  durch tools/aussprache.py – erst über eine Textregel, dann über eine
-  Korrektur direkt in der Lautschrift. Geprüft von tools/aussprachetest.py.
+* **Lebendigkeit.** Piper kam über einen Tonumfang von 3,64 Halbtönen nicht
+  hinaus, Gemini liegt bei 7,12 – im Messlauf über dieselben Sätze. Und das
+  ohne Verlust an Verständlichkeit: die Hörprobe fiel bei Piper bei 27 % der
+  Aufnahmen durch, bei Gemini bei 8 %.
 
-* **Stimmen.** Für Deutsch gibt es bei Piper genau eine wirklich gute Stimme
-  (thorsten-high) und eine brauchbare weibliche (eva_k). Das früher benutzte
-  Modell mls-medium hat 236 Sprecher, aber schlechte Qualität: im Hörtest
-  wurden 81 % der Figurenzeilen nicht mehr verstanden. Es ist ersetzt.
+* **Aussprache.** «Znüni» und «Rösti» sitzen auf Anhieb. Bei Piper brauchte
+  es dafür einen Eingriff direkt in der Lautschrift, weil espeak /tsn/ am
+  Wortanfang nicht bilden kann. Das Wörterbuch (tools/aussprache.py) bleibt
+  liegen, wird hier aber nicht mehr gebraucht.
 
-* **Tonhöhe.** Verschiebungen laufen über rubberband mit erhaltenen Formanten.
-  Die alte Methode (asetrate) verschob die Formanten mit und klang gepresst;
-  im Messlauf fiel die Verständlichkeit dabei von 1,00 auf 0,88.
+* **Besetzung.** 30 Stimmen statt eines Sprechers mit acht Färbungen. Welche
+  Stimme männlich und welche weiblich ist, steht in keiner Dokumentation und
+  ist am Namen nicht zu erkennen – «Puck» klingt nach Kobold und ist ein
+  Mann. Die Besetzung unten ist deshalb eingemessen: Grundton **und**
+  Formanten, letztere weil im Bereich 150–175 Hz eine hohe Männer- und eine
+  tiefe Frauenstimme sonst nicht zu trennen sind.
 
-* **Lebendigkeit.** Wer nur auf Verständlichkeit optimiert, landet bei einer
-  flachen Stimme – die ist am leichtesten zu erkennen. Deshalb bekommt jede
-  Zeile eine Regieanweisung (tools/regie.py): Färbung, Tempo, Lautheit und
-  Tonhöhe richten sich danach, was gerade passiert. Gemessen mit
-  tools/lebendigkeit.py.
+Was Gemini schlechter kann:
+
+* Es spricht gelegentlich die Regieanweisung mit («Neugierig fragend? Wer hat
+  andere Schuhe?»). Jede Aufnahme wird deshalb abgehört und bei Bedarf
+  wiederholt – siehe pruefen() weiter unten.
+* Es ist ein Vorschaumodell ohne Zusicherung. Ein Neubau in einem Jahr kann
+  anders klingen. Die fertigen MP3 sind davon nicht betroffen.
 
 Zwei Messungen halten sich gegenseitig in Schach: tools/hoerprobe.py prüft,
 ob man es versteht, tools/lebendigkeit.py, ob es lebt.
 """
-import hashlib, json, os, subprocess, sys, wave
-
-import numpy as np
+import base64, hashlib, json, os, struct, subprocess, sys, time, urllib.error, urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from aussprache import text_vorbereiten, laute_korrigieren
-from regie import anweisung, text_faerben, situation
+from regie import anweisung, text_faerben, situation, REGIEWORTE
 
-STIMMEN = "/home/claude/voices"
-HIGH = f"{STIMMEN}/de_DE-thorsten-high.onnx"           # männlich, beste Qualität
-EMO  = f"{STIMMEN}/de_DE-thorsten_emotional-medium.onnx"  # derselbe Sprecher, 8 Färbungen
-EVA  = f"{STIMMEN}/de_DE-eva_k-x_low.onnx"             # weiblich, x_low – ungenutzt
 ZIEL = "assets/voice"
+MODELL = os.environ.get('GEMINI_MODELL', 'gemini-3.1-flash-tts-preview')
+SCHLUESSELDATEI = os.environ.get('GEMINI_KEY', '/tmp/.gk')
 
-# Färbungen des emotional-Modells
-AMUSED, ANGRY, DISGUSTED, DRUNK, NEUTRAL, SLEEPY, SURPRISED, WHISPER = range(8)
-
-# Rolle -> (Modell, Sprecher, Tonhöhe)
+# Rolle -> Gemini-Stimme.
 #
-# Ausgewählt mit einem Messlauf: derselbe Satz durch jede Einstellung, danach
-# von einem Spracherkenner abgehört. Über fünf kurze Zeugensätze gemittelt:
+# Eingemessen, nicht nach Namen geraten: derselbe neutrale Satz durch alle 30
+# Stimmen, danach Grundton und Formanten gemessen. Die Formanten entscheiden
+# im Grenzbereich, weil sie die Länge des Ansatzrohrs zeigen und nicht von der
+# Tonhöhe abhängen. Ergebnis: 14 männlich, 15 weiblich, 1 Grenzfall.
 #
-#   emo amused +12 %  0,97      high roh          0,82
-#   emo surprised     0,93      eva_k +/- 4 %     0,76
-#   emo neutral       0,92      eva_k roh         0,76
-#   emo sleepy        0,91      eva_k Tempo 0,95  0,70
-#   high  -6 %        0,89      mls-medium        0,72
+#   Stimme          Grundton   F3     Lage
+#   Iapetus            126    2746    männlich   – Erzähler, klar
+#   Rasalgethi         139    2746    männlich
+#   Algenib            129    2508    männlich   – rau
+#   Alnilam            110    2713    männlich   – fest
+#   Gacrux             152    2958    weiblich   – reif
+#   Kore               171    2909    weiblich   – fest
+#   Callirrhoe         169    2951    weiblich   – gelassen
+#   Vindemiatrix       163    2880    weiblich   – sanft
+#   Fenrir             193    3032    weiblich   – aufgeregt
+#   Leda               181    3057    weiblich   – jugendlich
 #
-# Daraus drei Regeln:
-#   * eva_k (Qualitätsstufe x_low) trägt keine Rolle mehr – zu unsauber.
-#   * Tempoänderungen kosten immer Verständlichkeit und entfallen ganz.
-#   * Tonhöhe nur über rubberband mit erhaltenen Formanten, höchstens 18 %.
-#
-# Die Figuren klingen damit alle nach demselben Sprecher in verschiedenen
-# Färbungen. Für Deutsch gibt es bei Piper keine zweite gute Stimme; wer echte
-# Vielfalt will, muss die 135 Zeilen von Menschen einsprechen lassen.
+# Gemini hat keine Kinderstimmen. Für Kevin und Luis übernimmt eine helle
+# Stimme die Rolle und bekommt das Alter als Regieanweisung mit (regie.FIGUR);
+# das ist beim Synchronisieren von Kinderrollen das übliche Vorgehen.
 CAST = {
-    # Der Erzähler läuft über das Färbungsmodell, nicht über thorsten-high:
-    # nur so lässt sich der Tonfall je Situation wechseln. Die Färbung setzt
-    # nicht die Besetzung, sondern die Regie (tools/regie.py) pro Zeile.
-    'erzaehler':  (EMO,  None,      1.00),
+    'erzaehler':  'Iapetus',       # trägt 108 der 135 Zeilen
 
-    # Frauen – helle Färbung, unterschiedlich hoch
-    'odermatt':   (EMO,  AMUSED,    1.08),
-    'rueegg':     (EMO,  AMUSED,    1.10),
-    'beeler':     (EMO,  AMUSED,    1.12),
-    'huebscher':  (EMO,  AMUSED,    1.06),
-    'egli':       (EMO,  AMUSED,    1.13),
-    'nina':       (EMO,  AMUSED,    1.11),
-    'jill':       (EMO,  AMUSED,    1.15),
-    'enia':       (EMO,  AMUSED,    1.09),
-    'nora':       (EMO,  AMUSED,    1.14),
-    'livia':      (EMO,  AMUSED,    1.16),
-    'selina':     (EMO,  AMUSED,    1.12),
-    'mira':       (EMO,  AMUSED,    1.07),
-    'baertschi':  (EMO,  NEUTRAL,   1.05),
-    'steiner':    (EMO,  SURPRISED, 1.04),
-    'ammann':     (EMO,  NEUTRAL,   1.02),
+    # Erwachsene Frauen
+    'odermatt':   'Gacrux',        # Ladenbesitzerin, reif
+    'rueegg':     'Kore',
+    'beeler':     'Callirrhoe',
+    'huebscher':  'Vindemiatrix',
+    'egli':       'Achernar',
 
-    # Männer – dunkler, über Färbung unterschieden
-    'kunz':       (HIGH, None,      0.94),
-    'sutter':     (EMO,  SLEEPY,    0.96),
-    'frei':       (EMO,  NEUTRAL,   0.97),
-    'zaugg':      (EMO,  SURPRISED, 0.98),
+    # Erwachsene Männer
+    'frei':       'Rasalgethi',
+    'kunz':       'Alnilam',
+    'sutter':     'Algenib',       # Förster, raue Stimme
+    'ammann':     'Umbriel',
 
-    # Kinder – höchste geprüfte Anhebung
-    'kevin':      (EMO,  AMUSED,    1.17),
-    'luis':       (EMO,  AMUSED,    1.18),
-    'ruben':      (EMO,  AMUSED,    1.16),
-    'timo':       (EMO,  AMUSED,    1.18),
-    'dario':      (EMO,  AMUSED,    1.15),
-    'aaron':      (EMO,  AMUSED,    1.17),
+    # Jungen – helle Stimme plus Altersanweisung
+    'kevin':      'Fenrir',
+    'luis':       'Leda',
+    'ruben':      'Zephyr',
+    'timo':       'Sulafat',
+    'dario':      'Despina',
+    'aaron':      'Autonoe',
+
+    # Mädchen
+    'nina':       'Erinome',
+    'jill':       'Aoede',
+    'enia':       'Laomedeia',
+    'nora':       'Schedar',
+    'livia':      'Achernar',
+    'selina':     'Kore',
+    'mira':       'Callirrhoe',
+    'baertschi':  'Gacrux',
+    'steiner':    'Vindemiatrix',
+    'zaugg':      'Charon',
 }
+
+_schluessel = None
+
+
+def schluessel():
+    global _schluessel
+    if _schluessel is None:
+        if not os.path.exists(SCHLUESSELDATEI):
+            sys.exit(f"Kein Gemini-Schlüssel unter {SCHLUESSELDATEI}. "
+                     f"Pfad über GEMINI_KEY setzen.")
+        _schluessel = open(SCHLUESSELDATEI).read().strip()
+    return _schluessel
+
+
+def sprechen(text, stimme, regie):
+    """Eine Zeile synthetisieren. Gibt (PCM-Bytes, Abtastrate) zurück."""
+    koerper = json.dumps({
+        "contents": [{"parts": [{"text": f'{regie}: "{text}"'}]}],
+        "generationConfig": {
+            "responseModalities": ["AUDIO"],
+            "speechConfig": {
+                "voiceConfig": {"prebuiltVoiceConfig": {"voiceName": stimme}}},
+        },
+    }).encode()
+    req = urllib.request.Request(
+        f"https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{MODELL}:generateContent?key={schluessel()}",
+        data=koerper, headers={'Content-Type': 'application/json'})
+    d = json.load(urllib.request.urlopen(req, timeout=180))
+    teil = d['candidates'][0]['content']['parts'][0]['inlineData']
+    rate = 24000
+    for stueck in teil['mimeType'].split(';'):
+        if stueck.strip().startswith('rate='):
+            rate = int(stueck.strip()[5:])
+    return base64.b64decode(teil['data']), rate
+
+
+def wav_schreiben(pfad, pcm, rate):
+    with open(pfad, 'wb') as f:
+        f.write(b'RIFF' + struct.pack('<I', 36 + len(pcm)) + b'WAVEfmt ')
+        f.write(struct.pack('<IHHIIHH', 16, 1, 1, rate, rate * 2, 2, 16))
+        f.write(b'data' + struct.pack('<I', len(pcm)) + pcm)
+
+
+_erkenner = None
+
+
+def pruefen(pfad, sollte):
+    """Hört die frische Aufnahme ab. Liefert (Güte 0..1, gehört).
+
+    Der eine Fehler, den Gemini regelmässig macht, ist die mitgesprochene
+    Regieanweisung. Den fängt kein Blick auf die Datei, nur das Zuhören.
+    """
+    global _erkenner
+    import difflib
+    from hoerprobe import worte
+    if _erkenner is None:
+        from faster_whisper import WhisperModel
+        _erkenner = WhisperModel("small", device="cpu", compute_type="int8")
+    segs, _ = _erkenner.transcribe(pfad, language="de", beam_size=5)
+    gehoert = " ".join(s.text.strip() for s in segs)
+    fremd = set(worte(gehoert)) - set(worte(sollte))
+    if fremd & REGIEWORTE:
+        return 0.0, f"Regie mitgesprochen: {gehoert}"
+
+    # Zwei Masse, weil sie verschiedene Fehler sehen.
+    #
+    # Wortweise ist streng, straft aber die Tokenisierung des Erkenners ab:
+    # «Zickzack-Sohle» kommt als «Zick zack Sohle» zurück – wortweise ein
+    # Totalausfall, gesprochen völlig richtig.
+    #
+    # Buchstabenweise ist umgekehrt zu milde: «Röstis» gegen «Rustys» sind
+    # 0,88, obwohl der Hund falsch heisst.
+    #
+    # Deshalb gilt eine Aufnahme nur als sauber, wenn eines der beiden Masse
+    # deutlich hoch liegt – 0,85 wortweise oder 0,97 buchstabenweise. Sonst
+    # wird wiederholt und am Ende der beste Versuch behalten.
+    wort = difflib.SequenceMatcher(None, worte(sollte), worte(gehoert)).ratio()
+    zeichen = difflib.SequenceMatcher(None, "".join(worte(sollte)),
+                                      "".join(worte(gehoert))).ratio()
+    if wort >= 0.85 or zeichen >= 0.97:
+        return 1.0, gehoert
+    return max(wort, zeichen) * 0.9, f"({wort:.2f}/{zeichen:.2f}): {gehoert}"
 
 
 def faelle_lesen():
@@ -180,94 +264,63 @@ def zeilen():
 _modelle = {}
 
 
-def modell(pfad):
-    if pfad not in _modelle:
-        from piper import PiperVoice
-        _modelle[pfad] = PiperVoice.load(pfad)
-    return _modelle[pfad]
-
-
-def sprechen(V, text, sprecher, tempo=1.0, rhythmus=1.0, ausdruck=None):
-    """Text einlauten, Aussprache korrigieren, Audio erzeugen.
-
-    tempo   – length_scale, grösser heisst langsamer.
-    rhythmus – noise_w_scale, grösser heisst ungleichmässigere Silbenlängen.
-               Beides kommt aus der Regieanweisung für diese Zeile."""
-    from piper import SynthesisConfig
-    cfg = SynthesisConfig(normalize_audio=True, speaker_id=sprecher,
-                          length_scale=tempo, noise_w_scale=rhythmus,
-                          noise_scale=ausdruck)
-
-    saetze = V.phonemize(text_vorbereiten(text))
-    stuecke = []
-    for laute in saetze:
-        laute = list(laute_korrigieren(''.join(laute)))
-        if not laute:
-            continue
-        ids = V.phonemes_to_ids(laute)
-        a = V.phoneme_ids_to_audio(ids, cfg)
-        if isinstance(a, tuple):
-            a = a[0]
-        stuecke.append(np.asarray(a, dtype=np.float32))
-        stuecke.append(np.zeros(int(V.config.sample_rate * 0.12), dtype=np.float32))
-    if not stuecke:
-        return np.zeros(1, dtype=np.float32)
-    return np.concatenate(stuecke)
-
-
-def wav_schreiben(pfad, audio, rate):
-    x = np.clip(audio, -1, 1)
-    if np.max(np.abs(x)) > 1e-6:
-        x = x / np.max(np.abs(x)) * 0.97
-    with wave.open(pfad, 'w') as w:
-        w.setnchannels(1)
-        w.setsampwidth(2)
-        w.setframerate(rate)
-        w.writeframes((x * 32767).astype(np.int16).tobytes())
-
-
 def bauen(nur=None, alles_neu=False):
     os.makedirs(ZIEL, exist_ok=True)
     L = zeilen()
     if nur:
         L = [x for x in L if x[0].startswith(nur)]
 
-    stand = {}
     sperre = 'tools/voice.lock'
-    if os.path.exists(sperre) and not alles_neu:
-        stand = json.load(open(sperre))
+    stand = json.load(open(sperre)) if os.path.exists(sperre) and not alles_neu else {}
 
-    neu = 0
+    neu = wiederholt = aufgegeben = offen = 0
     for vid, text, rolle in L:
-        mod, spk, hoehe = CAST.get(rolle, CAST['erzaehler'])
+        stimme = CAST.get(rolle, CAST['erzaehler'])
+        regie = anweisung(vid, rolle)
+        gesprochen = text_faerben(vid, text)
         sig = hashlib.sha1(
-            f"{text}|{rolle}|{mod}|{spk}|{hoehe}|{anweisung(vid, rolle)}|v9".encode()).hexdigest()[:12]
+            f"{gesprochen}|{rolle}|{stimme}|{regie}|{MODELL}|g1".encode()).hexdigest()[:12]
         ziel = f"{ZIEL}/{vid}.mp3"
         if stand.get(vid) == sig and os.path.exists(ziel):
             continue
 
-        faerbung, tempo, laut, hoehe_r, rhythmus, ausdruck = anweisung(vid, rolle)
-        # Rollen mit eigener Färbung behalten sie – sonst klänge jede Figur
-        # in jeder Situation anders und wäre nicht mehr wiederzuerkennen.
-        sprecher = spk if spk is not None else (faerbung if mod == EMO else None)
+        # Bis zu vier Anläufe. Gemini ist nicht deterministisch: dieselbe Zeile
+        # kam im Messlauf einmal als «Wellenzule» und einmal als «Wellensohle»
+        # zurück. Der beste Versuch wird behalten, nicht der letzte – sonst
+        # verschlechtert eine Wiederholung das Ergebnis.
+        beste, bester_text = 0.0, None
+        for versuch in range(4):
+            try:
+                pcm, rate = sprechen(gesprochen, stimme, regie)
+            except Exception as e:
+                print(f"  ! {vid}: {type(e).__name__}, Anlauf {versuch + 1}", flush=True)
+                time.sleep(4)
+                continue
+            wav_schreiben('/tmp/_v.wav', pcm, rate)
+            subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', '/tmp/_v.wav',
+                            '-af', 'highpass=f=70,loudnorm=I=-16:TP=-1.5:LRA=11',
+                            '-c:a', 'libmp3lame', '-b:a', '64k',
+                            '-ar', '22050', '-ac', '1', '/tmp/_v.mp3'], check=True)
+            guete, was = pruefen('/tmp/_v.mp3', gesprochen)
+            if guete > beste:
+                beste, bester_text = guete, was
+                subprocess.run(['cp', '/tmp/_v.mp3', ziel], check=True)
+            if guete >= 1.0:
+                break
+            wiederholt += 1
+            print(f"  ~ {vid}: {was}", flush=True)
 
-        V = modell(mod)
-        audio = sprechen(V, text_faerben(vid, text), sprecher, tempo, rhythmus, ausdruck)
-        wav_schreiben('/tmp/_v.wav', audio, V.config.sample_rate)
+        if bester_text is None:
+            aufgegeben += 1
+            print(f"  ✗ {vid}: keine Antwort erhalten", flush=True)
+        else:
+            stand[vid] = sig
+            neu += 1
+            if beste < 1.0:
+                offen += 1
+                print(f"  · {vid} bleibt auffällig {bester_text}", flush=True)
 
-        af = []
-        gesamt = hoehe * hoehe_r
-        if abs(gesamt - 1.0) > 0.001:
-            # Formanten bleiben stehen: die Stimme wird höher, nicht gepresst.
-            af.append(f"rubberband=pitch={gesamt:.4f}:formant=preserved")
-        af.append(f"highpass=f=70,loudnorm=I={laut}:TP=-1.5:LRA=11")
-
-        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', '/tmp/_v.wav',
-                        '-af', ','.join(af), '-c:a', 'libmp3lame', '-b:a', '64k',
-                        '-ar', '22050', '-ac', '1', ziel], check=True)
-        stand[vid] = sig
-        neu += 1
-        if neu % 15 == 0:
+        if neu and neu % 15 == 0:
             print(f"  {neu} vertont ...", flush=True)
 
     json.dump(stand, open(sperre, 'w'), indent=0)
@@ -277,10 +330,13 @@ def bauen(nur=None, alles_neu=False):
         fh.write("/* Erzeugt von tools/voice.py. Nicht von Hand ändern. */\n")
         fh.write("export const STIMMEN = " + json.dumps(ids, ensure_ascii=False, indent=0) + ";\n")
     groesse = sum(os.path.getsize(f"{ZIEL}/{x}") for x in os.listdir(ZIEL))
-    print(f"fertig: {len(ids)} Aufnahmen, {neu} neu, {groesse // 1024} KB gesamt")
+    print(f"fertig: {len(ids)} Aufnahmen, {neu} neu, {wiederholt} Wiederholungen, "
+          f"{offen} bleiben auffällig, {aufgegeben} ohne Antwort, "
+          f"{groesse // 1024} KB gesamt")
+    return aufgegeben
 
 
 if __name__ == '__main__':
     a = sys.argv[1:]
     nur = a[a.index('--nur') + 1] if '--nur' in a else None
-    bauen(nur, alles_neu='--neu' in a)
+    sys.exit(1 if bauen(nur, alles_neu='--neu' in a) else 0)

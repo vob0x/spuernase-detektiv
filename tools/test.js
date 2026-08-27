@@ -207,19 +207,38 @@ const sag = (t) => { log.push(t); console.log(t); };
   }
 
   async function lineup(F) {
+    /* Nicht mit fester Wartezeit weiterklicken. Die App wechselt erst zur
+       naechsten Runde, wenn die Erklaerung zu Ende gesprochen ist – und die
+       Aufnahmen sind seit dem Wechsel auf Gemini im Schnitt 4,65 statt 2,86
+       Sekunden lang. Ein fester Wert von 2,9 Sekunden klickte in die noch
+       laufende Runde hinein und brachte den ganzen Ablauf aus dem Tritt.
+       Deshalb: auf den Rundenzaehler im Kopf warten. */
+    const runde = () => page.evaluate(() => {
+      const s = document.querySelector('.kopf__titel small');
+      return s ? s.textContent.trim() : '';
+    });
     for (let i = 0; i < F.lineup.length; i++) {
-      await warteAuf('lineup', 20000);
+      await warteAuf('lineup', 25000);
+      const vorher = await runde();
       for (const id of F.lineup[i]) {
         const p = L(`[data-v="${id}"]`);
         if (await p.evaluate(e => e.classList.contains('person--raus'))) continue;
         await p.click({ force: true }); await warte(350);
       }
-      await warte(2900);
+      // Warten, bis der Zaehler weiterspringt oder die Phase wechselt.
+      const bis = Date.now() + 25000;
+      while (Date.now() < bis) {
+        if (await screen() !== 'lineup') break;
+        if (await runde() !== vorher) break;
+        await warte(200);
+      }
     }
   }
 
   async function verhaftung(F) {
-    await warteAuf('verhaftung');
+    // Grosszuegiger als frueher: die Schlusserklaerung der letzten
+    // Lineup-Runde laeuft noch, wenn diese Phase beginnt.
+    await warteAuf('verhaftung', 25000);
     await klick(`[data-v="${F.taeter}"]`);
     await warte(2600);
   }

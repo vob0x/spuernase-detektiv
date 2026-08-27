@@ -21,7 +21,12 @@ ZAHL = {'null':'0','eins':'1','ein':'1','zwei':'2','drei':'3','vier':'4','fünf'
         'siebzehn':'17','achtzehn':'18','neunzehn':'19','zwanzig':'20',
         'dreissig':'30','vierzig':'40','fünfzig':'50',
         'vierundzwanzig':'24','achtunddreissig':'38','sechsunddreissig':'36',
-        'zentimeter':'cm','meter':'m','uhr':'', 'grösse':'grosse'}
+        'zentimeter':'cm','meter':'m','uhr':'', 'grösse':'grosse',
+        # Der Erkenner schreibt den deutsch gesprochenen Namen «Luis» als
+        # «Louis» – dieselbe Aussprache, die gebräuchlichere Schreibweise.
+        # «Louise» steht bewusst NICHT hier: das ist ein anderer Name und
+        # muss weiterhin als Fehler auffallen.
+        'louis':'luis'}
 
 def worte(s):
     s = s.lower().replace('ß', 'ss')
