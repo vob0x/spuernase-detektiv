@@ -1,8 +1,15 @@
 /* Audio-Engine: alles synthetisiert, keine einzige Audiodatei.
    Drei Busse (Musik, Kulisse, Effekte) laufen ueber einen gemeinsamen
-   Hall und einen Kompressor, damit nichts uebersteuert. */
+   Hall und einen Kompressor, damit nichts uebersteuert.
+
+   Die Klangbetten der Kulissen stehen in js/kulisse.js: sie werden einmal
+   als Sample ausgerechnet und dann in Schleife gespielt. Ein Bandpass ueber
+   Rauschen – der alte Weg – klingt immer nach Rauschen und nie nach Ort. */
+
+import { bettBauen, ORTE } from './kulisse.js';
 
 let ctx = null, master, komp, hallBus, trocken, busMusik, busAmb, busSfx, rauschBuf, hellBuf;
+const betten = new Map();   // Name -> AudioBuffer, einmal gebaut
 let tonAn = true, musikAn = false;
 let aktuelleKulisse = null, kulisseName = null, gewuenscht = null, musikHandle = null;
 
@@ -163,6 +170,26 @@ function teppich({ f = 500, q = 0.7, typ = 'bandpass', vol = 0.1, lfoHz = 0.08, 
   return () => { try { s.stop(); lfo.stop(); } catch (e) {} };
 }
 
+/* Ein Klangbett in Schleife. Das Sample wird beim ersten Gebrauch gebaut
+   (rund 40-250 ms Rechenzeit) und danach wiederverwendet. */
+function bett(name, vol, rate = 1) {
+  let buf = betten.get(name);
+  if (!buf) {
+    const roh = bettBauen(name, ctx.sampleRate, 8);
+    buf = ctx.createBuffer(1, roh.length, ctx.sampleRate);
+    buf.copyToChannel(roh, 0);
+    betten.set(name, buf);
+  }
+  const s = ctx.createBufferSource();
+  s.buffer = buf; s.loop = true; s.playbackRate.value = rate;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, ctx.currentTime);
+  g.gain.exponentialRampToValueAtTime(vol, ctx.currentTime + 1.2);
+  s.connect(g); g.connect(busAmb);
+  s.start(ctx.currentTime + Math.random() * 0.3);
+  return () => { try { s.stop(); } catch (e) {} };
+}
+
 /* Zufaellig wiederkehrendes Ereignis */
 function ereignis(fn, minS, maxS) {
   let id = null, tot = false;
@@ -218,6 +245,65 @@ function ticken() {
   rausch({ d: 0.02, vol: 0.14, f: 2600, q: 5, bus: busAmb, hell: true });
 }
 
+/* Schulhausglocke: zwei Toene, mehrfach angeschlagen. */
+function schulklingel() {
+  for (let i = 0; i < 6; i++) {
+    glocke({ f: 1046, t: i * 0.26, d: 0.5, vol: 0.055, bus: busAmb });
+    glocke({ f: 1568, t: i * 0.26, d: 0.35, vol: 0.035, bus: busAmb });
+  }
+}
+
+/* Stuhl auf Parkett: kurzes Schaben mit fallender Farbe. */
+function stuhlruecken() {
+  rausch({ d: 0.45, vol: 0.05, f: 1700, q: 3.5, glide: 620, bus: busAmb, hell: true });
+  rausch({ t: 0.4, d: 0.09, vol: 0.05, f: 320, q: 2, bus: busAmb });
+}
+
+/* Perrondurchsage: Sprechrhythmus hinter einem Megafon-Bandpass. */
+function durchsage() {
+  const n = 7 + Math.floor(Math.random() * 5);
+  for (let i = 0; i < n; i++) {
+    const t = i * (0.17 + Math.random() * 0.09);
+    const f = 150 + Math.random() * 110;
+    const o = ton({ f, t, d: 0.13, typ: 'sawtooth', vol: 0.035, bus: busAmb });
+    if (o) {
+      const now = ctx.currentTime + t;
+      o.frequency.linearRampToValueAtTime(f * (0.85 + Math.random() * 0.35), now + 0.13);
+    }
+  }
+}
+
+/* Velo faehrt vorbei: Freilauf-Ratschen plus Reifen auf Kies. */
+function velo() {
+  for (let i = 0; i < 26; i++)
+    rausch({ t: i * 0.035, d: 0.012, vol: 0.022 * (1 - Math.abs(i - 13) / 16),
+             f: 3400, q: 9, bus: busAmb, hell: true });
+  rausch({ d: 0.95, vol: 0.03, f: 700, q: 1.2, glide: 300, bus: busAmb });
+}
+
+/* Heizungsrohr im Museum: kurzes metallisches Knacken. */
+function heizung() {
+  for (let i = 0; i < 3; i++)
+    glocke({ f: 620 + Math.random() * 500, t: i * 0.13, d: 0.22, vol: 0.028, bus: busAmb });
+}
+
+/* Specht: schnelle Folge harter Schlaege auf Holz. */
+function specht() {
+  for (let i = 0; i < 9; i++)
+    rausch({ t: i * 0.045, d: 0.02, vol: 0.045, f: 1500, q: 6, bus: busAmb });
+}
+
+/* Ast knackt im Unterholz. */
+function ast() {
+  rausch({ d: 0.05, vol: 0.05, f: 900, q: 4, bus: busAmb });
+  rausch({ t: 0.05, d: 0.22, vol: 0.02, f: 2600, q: 2, bus: busAmb, hell: true });
+}
+
+/* Umgeblaetterte Seite im Buero. */
+function blaettern() {
+  rausch({ d: 0.26, vol: 0.035, f: 3200, q: 1.1, glide: 5200, bus: busAmb, hell: true });
+}
+
 function knarren() {
   const o = ton({ f: 180, d: 0.9, typ: 'sawtooth', vol: 0.022, glide: 120, bus: busAmb });
   rausch({ d: 0.9, vol: 0.014, f: 700, q: 3, bus: busAmb });
@@ -226,59 +312,27 @@ function knarren() {
 
 /* ---------------- Kulissen ---------------- */
 
-const KULISSEN = {
-  schule: () => {
-    const s = [
-      teppich({ f: 260, q: 0.4, typ: 'lowpass', vol: 0.055, lfoHz: 0.05 }),
-      teppich({ f: 1900, q: 0.5, vol: 0.10, lfoHz: 0.13, lfoTiefe: 0.6, hell: true }),   // Regen
-      ereignis(() => rausch({ d: 0.5, vol: 0.02, f: 420, q: 2, bus: busAmb }), 9, 22)
-    ];
-    return () => s.forEach(f => f());
-  },
-  bahnhof: () => {
-    const s = [
-      teppich({ f: 140, q: 0.4, typ: 'lowpass', vol: 0.07, lfoHz: 0.04 }),
-      teppich({ f: 620, q: 0.5, vol: 0.032, lfoHz: 0.09 }),
-      ereignis(zugVorbei, 22, 48),
-      ereignis(perronGong, 30, 70),
-      ereignis(vogel, 8, 20)
-    ];
-    return () => s.forEach(f => f());
-  },
-  dorfplatz: () => {
-    const s = [
-      teppich({ f: 420, q: 0.5, vol: 0.035, lfoHz: 0.07 }),
-      teppich({ f: 2900, q: 0.7, vol: 0.07, lfoHz: 0.22, lfoTiefe: 0.35, hell: true }), // Brunnen
-      ereignis(vogel, 4, 11),
-      ereignis(glockeKirche, 45, 90)
-    ];
-    return () => s.forEach(f => f());
-  },
-  museum: () => {
-    const s = [
-      teppich({ f: 180, q: 0.4, typ: 'lowpass', vol: 0.06, lfoHz: 0.03 }),
-      ereignis(ticken, 1.0, 1.05),
-      ereignis(knarren, 18, 42)
-    ];
-    return () => s.forEach(f => f());
-  },
-  wald: () => {
-    const s = [
-      teppich({ f: 780, q: 0.4, vol: 0.09, lfoHz: 0.06, lfoTiefe: 0.7, hell: true }),
-      teppich({ f: 200, q: 0.4, typ: 'lowpass', vol: 0.03, lfoHz: 0.04 }),
-      ereignis(vogel, 3, 9),
-      ereignis(grille, 5, 14)
-    ];
-    return () => s.forEach(f => f());
-  },
-  buero: () => {
-    const s = [
-      teppich({ f: 150, q: 0.4, typ: 'lowpass', vol: 0.045, lfoHz: 0.03 }),
-      ereignis(ticken, 2.0, 2.05)
-    ];
-    return () => s.forEach(f => f());
-  }
+/* Jeder Ort besteht aus seinen Betten (js/kulisse.js) plus den Ereignissen,
+   die man einzeln wiedererkennen soll. Die Ereignisse kommen deutlich haeufiger
+   als frueher – sonst hoert man zwischendurch nur den Grundton. */
+
+const EREIGNISSE = {
+  schule:    [[schulklingel, 55, 110], [stuhlruecken, 12, 30]],
+  bahnhof:   [[zugVorbei, 14, 30], [perronGong, 20, 45], [vogel, 7, 16], [durchsage, 34, 75]],
+  dorfplatz: [[vogel, 2.5, 7], [glockeKirche, 40, 80], [velo, 16, 38]],
+  museum:    [[ticken, 1.0, 1.05], [knarren, 9, 22], [heizung, 26, 60]],
+  wald:      [[vogel, 2, 6], [specht, 18, 44], [ast, 14, 36]],
+  buero:     [[ticken, 2.0, 2.05], [blaettern, 13, 32]]
 };
+
+const KULISSEN = {};
+for (const ort of Object.keys(ORTE)) {
+  KULISSEN[ort] = () => {
+    const aus = ORTE[ort].map(([n, v]) => bett(n, v));
+    for (const [fn, min, max] of (EREIGNISSE[ort] || [])) aus.push(ereignis(fn, min, max));
+    return () => aus.forEach(f => f());
+  };
+}
 
 function kulisseStoppen() {
   if (aktuelleKulisse) { aktuelleKulisse(); aktuelleKulisse = null; }

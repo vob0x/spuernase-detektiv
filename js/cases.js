@@ -141,7 +141,7 @@ export const FAELLE = [
   lineup: [
     { feld: 'velo', icon: 'reifen', label: 'Mountainbike',
       frage: 'Wer fährt etwas anderes?',
-      raus: ['v2', 'v3'], warum: 'Mira fährt Rennvelo, Aaron Trottinett.' },
+      raus: ['v2', 'v3'], warum: 'Mira fährt Rennvelo. Aaron fährt Trottinett.' },
     { feld: 'schuh', icon: 'schuh', label: '38',
       frage: 'Wer hat eine andere Grösse?',
       raus: ['v4'], warum: 'Nina trägt Grösse vierzig.' }
