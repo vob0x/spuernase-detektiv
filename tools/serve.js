@@ -2,7 +2,7 @@ const http = require('http'), fs = require('fs'), path = require('path');
 const root = require('path').resolve(process.argv[2] || '.');
 const MIME = { '.html':'text/html;charset=utf-8', '.js':'text/javascript;charset=utf-8',
   '.css':'text/css;charset=utf-8', '.json':'application/json', '.webmanifest':'application/manifest+json',
-  '.png':'image/png', '.webp':'image/webp', '.svg':'image/svg+xml', '.jpg':'image/jpeg' };
+  '.png':'image/png', '.webp':'image/webp', '.svg':'image/svg+xml', '.jpg':'image/jpeg', '.m4a':'audio/mp4', '.mp3':'audio/mpeg', '.wav':'audio/wav' };
 http.createServer((req,res)=>{
   let p = decodeURIComponent(req.url.split('?')[0]);
   if (p.endsWith('/')) p += 'index.html';

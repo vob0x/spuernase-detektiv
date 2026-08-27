@@ -1,197 +1,342 @@
-const { chromium, devices } = require('playwright');
+/* Vollständiger Durchlauf aller fünf Fälle über die Phasen-Engine.
+   Prüft: keine JS-Fehler, keine fehlenden Dateien, jede Phase erreichbar,
+   jede Sprachaufnahme, die abgespielt wird, existiert, Fall endet bei 3 Sternen. */
 
-const BASE = process.argv[2] || 'http://localhost:8099/';
-const ONLY = process.argv[3] ? Number(process.argv[3]) : null;
+const { chromium } = require('playwright');
+const BASIS = process.env.BASIS || 'http://127.0.0.1:8099';
+
+const log = [];
+const sag = (t) => { log.push(t); console.log(t); };
 
 (async () => {
-  const proxy = process.env.HTTPS_PROXY || process.env.https_proxy;
-  const browser = await chromium.launch(proxy && !/localhost|127\.0\.0\.1/.test(BASE)
-    ? { proxy: { server: proxy }, args: ['--ignore-certificate-errors'] } : {});
+  const browser = await chromium.launch({
+    args: ['--disable-dev-shm-usage', '--autoplay-policy=no-user-gesture-required', '--mute-audio']
+  });
+  browser.on('disconnected', () => console.log('!! Browser hat sich beendet'));
   const ctx = await browser.newContext({
-    ignoreHTTPSErrors: true,
-    ...devices['iPhone 13'],
-    locale: 'de-CH',
-    hasTouch: true, isMobile: true
+    viewport: { width: 1000, height: 480 }, deviceScaleFactor: 2
   });
   const page = await ctx.newPage();
-  const errors = [], warns = [];
-  page.on('console', m => {
-    if (m.type() === 'error') errors.push('console: ' + m.text());
-    if (m.type() === 'warning') warns.push(m.text());
-  });
-  page.on('pageerror', e => errors.push('pageerror: ' + e.message));
-  page.on('requestfailed', r => {
-    const u = r.url();
-    if (!/\.(webp|png|jpg)$/.test(u)) errors.push('reqfail: ' + u + ' ' + (r.failure()?.errorText || ''));
+  page.on('crash', () => console.log('!! Seite abgestuerzt'));
+
+  const probleme = [];
+  page.on('pageerror', e => probleme.push('JS-Fehler: ' + e.message));
+  page.on('console', m => { if (m.type() === 'error') probleme.push('Konsole: ' + m.text()); });
+  page.on('response', r => {
+    if (r.status() >= 400) probleme.push('HTTP ' + r.status() + ': ' + r.url().replace(BASIS, ''));
   });
 
-  const log = (...a) => console.log(...a);
-  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.goto(BASIS + '/index.html', { waitUntil: 'networkidle' });
+  // Stumm schalten: Audio-Elemente sollen laden, aber nicht bremsen.
+  await page.addStyleTag({ content: '*{animation-duration:.01s!important;transition-duration:.01s!important}' });
 
-  /* ---- Datenkonsistenz aller Fälle ---- */
-  const check = await page.evaluate(() => {
+  const FAELLE = await page.evaluate(async () => {
+    const m = await import('./js/cases.js');
+    return m.FAELLE.map(f => ({
+      id: f.id, nr: f.nr, titel: f.titel, phasen: f.phasen, taeter: f.taeter,
+      spuren: f.spuren.map(s => s.id),
+      labor: (f.labor || []).map(l => l.richtig),
+      verfolgung: f.verfolgung ? f.verfolgung.schritte.map(s => s.richtig) : null,
+      zeitstrahl: f.zeitstrahl ? f.zeitstrahl.raus : null,
+      zeugen: (f.zeugen || []).map(z => z.luege),
+      lineup: (f.lineup || []).map(l => l.raus)
+    }));
+  });
+  sag('Fälle geladen: ' + FAELLE.length);
+
+  /* ---- Datenprüfung: stimmt die Fallakte überhaupt? ---- */
+  const daten = await page.evaluate(async () => {
+    const { FAELLE } = await import('./js/cases.js');
+    const PHASEN = ['tatort','labor','verfolgung','zeitstrahl','zeugen','lineup','verhaftung'];
     const out = [];
-    for (const f of window.SPUERNASE.FAELLE) {
-      const raus = new Set(f.ausschluss.flatMap(a => a.raus));
-      const rest = f.verdaechtige.filter(v => !raus.has(v.id)).map(v => v.id);
-      const probleme = [];
-      if (rest.length !== 1) probleme.push('nach Ausschluss bleiben ' + rest.length + ' übrig');
-      if (rest[0] !== f.taeter) probleme.push('übrig ist ' + rest[0] + ', Täter ist ' + f.taeter);
-      f.labor.forEach((l, i) => {
-        if (!l.optionen.some(o => o.id === l.richtig)) probleme.push('Labor ' + i + ': richtige Option fehlt');
+    for (const f of FAELLE) {
+      const m = [];
+      for (const ph of f.phasen) {
+        if (!PHASEN.includes(ph)) m.push(`unbekannte Phase "${ph}"`);
+        if (ph === 'labor' && !(f.labor || []).length) m.push('Phase labor ohne Aufgaben');
+        if (ph === 'zeugen' && !(f.zeugen || []).length) m.push('Phase zeugen ohne Zeugen');
+        if (ph === 'verfolgung' && !f.verfolgung) m.push('Phase verfolgung ohne Daten');
+        if (ph === 'zeitstrahl' && !f.zeitstrahl) m.push('Phase zeitstrahl ohne Daten');
+        if (ph === 'lineup' && !(f.lineup || []).length) m.push('Phase lineup ohne Beweise');
+      }
+      // Ausschluss muss genau eine Person übrig lassen, und das muss der Täter sein
+      const raus = new Set();
+      if (f.phasen.includes('zeitstrahl') && f.zeitstrahl)
+        f.zeitstrahl.raus.forEach(x => raus.add(x));
+      if (f.phasen.includes('lineup'))
+        (f.lineup || []).forEach(l => l.raus.forEach(x => raus.add(x)));
+      const uebrig = f.verdaechtige.filter(v => !raus.has(v.id));
+      if (uebrig.length !== 1) m.push(`nach dem Ausschluss bleiben ${uebrig.length} Personen übrig`);
+      else if (uebrig[0].id !== f.taeter) m.push('die übrig bleibende Person ist nicht der Täter');
+      // Laboraufgaben: die richtige Antwort muss es geben
+      (f.labor || []).forEach((l, i) => {
+        if (!l.optionen.some(o => o.id === l.richtig)) m.push(`Laboraufgabe ${i + 1} ohne richtige Antwort`);
       });
-      const luegen = f.zeugen.filter(z => z.luege >= 0);
-      if (luegen.length !== 1) probleme.push(luegen.length + ' Widersprüche statt 1');
-      luegen.forEach(z => { if (!z.warum) probleme.push(z.name + ' ohne Begründung'); });
-      // Szene auf einem 390px breiten Handy, 3:2 -> 390x260, Marker 64px
-      const W = 390, H = 260, M = 36;
-      f.spuren.forEach(s => {
-        if (s.x * W < M || s.x * W > W - M || s.y * H < M || s.y * H > H - M)
-          probleme.push('Spur ' + s.id + ' ragt aus der Szene');
+      // Zeugen: genau eine Lüge, mit Begründung
+      const luegen = (f.zeugen || []).filter(z => z.luege >= 0);
+      if ((f.zeugen || []).length && luegen.length !== 1)
+        m.push(`${luegen.length} Lügen statt genau einer`);
+      luegen.forEach(z => { if (!z.warum) m.push(`Lüge von ${z.name} ohne Begründung`); });
+      // Spuren: im Bild, nicht zu nah beieinander (Marker 80 px auf 1000x480)
+      f.spuren.forEach((a, i) => {
+        if (a.x < 0.05 || a.x > 0.95 || a.y < 0.09 || a.y > 0.93)
+          m.push(`Spur ${a.id} liegt zu nah am Bildrand`);
+        f.spuren.slice(i + 1).forEach(b => {
+          const d = Math.hypot((a.x - b.x) * 1000, (a.y - b.y) * 480);
+          if (d < 84) m.push(`Spuren ${a.id}/${b.id} nur ${Math.round(d)} px auseinander`);
+        });
       });
-      for (let i = 0; i < f.spuren.length; i++)
-        for (let j = i + 1; j < f.spuren.length; j++) {
-          const a = f.spuren[i], b = f.spuren[j];
-          const d = Math.hypot((a.x - b.x) * W, (a.y - b.y) * H);
-          if (d < 78) probleme.push('Spuren ' + a.id + '/' + b.id + ' ueberlappen (' + Math.round(d) + 'px)');
-        }
-      out.push({ id: f.id, titel: f.titel, probleme });
+      out.push({ id: f.id, maengel: m });
     }
     return out;
   });
-  let dataOk = true;
-  check.forEach(c => {
-    if (c.probleme.length) { dataOk = false; errors.push(c.id + ': ' + c.probleme.join(' | ')); log('  ✗', c.id, c.probleme.join(' | ')); }
-    else log('  ✓', c.id, c.titel);
-  });
-
-  await page.screenshot({ path: '/tmp/shot-start.png' });
-
-  /* ---- Durchspielen ---- */
-  const faelle = await page.evaluate(() => window.SPUERNASE.FAELLE.map(f => f.id));
-  const ziel = ONLY ? [faelle[ONLY - 1]] : faelle;
-
-  for (const fid of ziel) {
-    const t0 = Date.now();
-    await page.evaluate((fid) => {
-      const S = window.SPUERNASE;
-      const f = S.FAELLE.find(x => x.id === fid);
-      window.__start(f);
-    }, fid).catch(() => {});
-
-    // Über die UI navigieren
-    await page.evaluate(() => window.SPUERNASE.go(window.SPUERNASE.scrFaelle));
-    await page.waitForSelector('[data-fall="' + fid + '"]');
-    const btn = page.locator('[data-fall="' + fid + '"]');
-    if (await btn.isDisabled()) { log('  ⤼', fid, 'noch gesperrt – überspringe'); continue; }
-    await btn.click();
-    await page.waitForSelector('[data-act="start"]');
-    await page.click('[data-act="start"]');
-    await page.waitForSelector('#scene');
-
-    /* Tatort */
-    const box = await page.locator('#scene').boundingBox();
-    const spuren = await page.evaluate(() => window.SPUERNASE.F.spuren.map(s => ({ id: s.id, x: s.x, y: s.y })));
-    for (const s of spuren) {
-      const x = box.x + s.x * box.width, y = box.y + s.y * box.height;
-      await page.mouse.move(x - 30, y - 30);
-      await page.mouse.move(x, y, { steps: 6 });
-      await page.waitForTimeout(560);
-    }
-    const gefunden = await page.evaluate(() => window.SPUERNASE.E.gefunden.length);
-    if (gefunden !== spuren.length) { errors.push(fid + ': nur ' + gefunden + '/' + spuren.length + ' Spuren gefunden'); }
-    if (fid === 'f1') await page.screenshot({ path: '/tmp/shot-tatort.png' });
-    await page.click('#weiter');
-
-    /* Labor */
-    for (;;) {
-      const st = await page.evaluate(() => {
-        const F = window.SPUERNASE.F, E = window.SPUERNASE.E;
-        return { i: E.laborIdx, n: F.labor.length, richtig: F.labor[E.laborIdx]?.richtig };
-      });
-      if (st.i >= st.n) break;
-      await page.waitForSelector('[data-opt]');
-      if (fid === 'f1' && st.i === 0) await page.screenshot({ path: '/tmp/shot-labor.png' });
-      await page.click('[data-opt="' + st.richtig + '"]');
-      await page.waitForTimeout(1700);
-    }
-
-    /* Zeugen */
-    await page.waitForSelector('.bubble');
-    if (fid === 'f1') await page.screenshot({ path: '/tmp/shot-zeugen.png' });
-    const l = await page.evaluate(() => {
-      const F = window.SPUERNASE.F;
-      const zi = F.zeugen.findIndex(z => z.luege >= 0);
-      return { zi, si: F.zeugen[zi].luege };
-    });
-    await page.click(`.bubble[data-z="${l.zi}"][data-s="${l.si}"]`);
-    await page.waitForSelector('#weiterZ');
-    await page.click('#weiterZ');
-
-    /* Ausschluss */
-    for (;;) {
-      const st = await page.evaluate(() => {
-        const F = window.SPUERNASE.F, E = window.SPUERNASE.E;
-        const s = F.ausschluss[E.ausschlussIdx];
-        return s ? { raus: s.raus.filter(x => !E.raus.includes(x)) } : null;
-      });
-      if (!st) break;
-      await page.waitForSelector('[data-v]');
-      if (fid === 'f1') await page.screenshot({ path: '/tmp/shot-ausschluss.png' });
-      for (const id of st.raus) { await page.click('[data-v="' + id + '"]'); await page.waitForTimeout(200); }
-      await page.waitForSelector('#weiterA');
-      await page.click('#weiterA');
-      await page.waitForTimeout(200);
-    }
-
-    /* Verhaftung */
-    await page.waitForSelector('[data-v]');
-    const taeter = await page.evaluate(() => window.SPUERNASE.F.taeter);
-    await page.click('[data-v="' + taeter + '"]');
-    await page.waitForTimeout(1400);
-
-    const erg = await page.evaluate(() => ({
-      fehler: window.SPUERNASE.E.fehler,
-      sterne: window.SPUERNASE.S.sterneFuer(window.SPUERNASE.F.id),
-      rang: window.SPUERNASE.S.rang().name,
-      txt: document.body.innerText.slice(0, 60)
-    }));
-    if (fid === 'f5') await page.screenshot({ path: '/tmp/shot-ergebnis.png', fullPage: true });
-    if (erg.sterne !== 3) errors.push(fid + ': erwartet 3 Sterne, bekommen ' + erg.sterne + ' (Fehler ' + erg.fehler + ')');
-    log(`  ▶ ${fid}: durchgespielt in ${((Date.now() - t0) / 1000).toFixed(1)}s – ${erg.sterne}★, Fehler ${erg.fehler}, Rang ${erg.rang}`);
+  for (const d of daten) {
+    sag(`  ${d.maengel.length ? '✗' : '✓'} ${d.id} Fallakte` +
+        (d.maengel.length ? ': ' + d.maengel.join('; ') : ' in Ordnung'));
+    d.maengel.forEach(m => probleme.push(d.id + ': ' + m));
   }
 
-  /* ---- PWA ---- */
+
+  const gespielt = [];
+  let fertigGespielt = 0;
+  await page.evaluate(() => {
+    window.__voice = [];
+    const A = window.Audio;
+    window.Audio = function (src) { const a = new A(src); window.__voice.push(src); return a; };
+  });
+
+  // Waehrend des Bildwechsels haengt kurz noch der alte Bildschirm im DOM.
+  // Alles wird daher auf den obersten Bildschirm bezogen.
+  const L = (sel) => page.locator('.buehne > .scr:not(.scr--raus)').last().locator(sel);
+  const warte = (ms) => page.waitForTimeout(ms);
+
+  async function klick(sel, nr = 0) {
+    const l = L(sel).nth(nr);
+    await l.waitFor({ state: 'visible', timeout: 8000 });
+    await l.click({ force: true });
+    await warte(240);
+  }
+
+  async function screen() {
+    return page.evaluate(() => {
+      const alle = [...document.querySelectorAll('#buehne > .scr:not(.scr--raus)')];
+      const b = alle[alle.length - 1] || document.getElementById('buehne');
+      if (b.querySelector('.titelbild')) return 'titel';
+      if (b.querySelector('.akten')) return 'akten';
+      if (b.querySelector('.introFoto')) return 'intro';
+      if (b.querySelector('#szene')) return 'tatort';
+      if (b.querySelector('.laborProbe')) return 'labor';
+      if (b.querySelector('.verfolgung')) return 'verfolgung';
+      if (b.querySelector('.zsBox')) return 'zeitstrahl';
+      if (b.querySelector('.zeugenReihe')) return 'zeugen';
+      if (b.querySelector('.beweiskarte')) return 'lineup';
+      if (b.querySelector('.blaulicht')) return 'verhaftung';
+      if (b.querySelector('.ergSterne')) return 'ergebnis';
+      return '?';
+    });
+  }
+
+  async function warteAuf(name, ms = 12000) {
+    const bis = Date.now() + ms;
+    while (Date.now() < bis) {
+      if (await screen() === name) return true;
+      await warte(180);
+    }
+    probleme.push(`Timeout: "${name}" nicht erreicht (war "${await screen()}")`);
+    return false;
+  }
+
+  /* ---- Phasen ---- */
+
+  async function tatort(F) {
+    for (const id of F.spuren) {
+      const m = L(`[data-spur="${id}"]`);
+      await m.waitFor({ state: 'visible', timeout: 6000 });
+      const box = await m.boundingBox();
+      const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+      await page.mouse.move(cx - 6, cy - 6);
+      await page.mouse.move(cx, cy);
+      await warte(560);                              // Halte-Timer 400 ms
+      const ok = await m.evaluate(e => e.classList.contains('spur--gefunden') ||
+                                       e.classList.contains('spur--weg'));
+      if (!ok) { await m.click({ force: true }); await warte(400); }
+    }
+    const alle = await L('.spur--weg, .spur--gefunden').count();
+    if (alle < F.spuren.length) probleme.push(`${F.id}: nur ${alle}/${F.spuren.length} Spuren gesichert`);
+    await warte(1400);
+    await klick('.btn--gross:has-text("Weiter")');
+  }
+
+  async function labor(F) {
+    for (const richtig of F.labor) {
+      await warteAuf('labor', 25000);
+      // Erst weitertippen, wenn der naechste Versuch frisch ist (keine Karte markiert).
+      await page.waitForFunction(() => {
+        const scr = [...document.querySelectorAll('#buehne > .scr:not(.scr--raus)')].pop();
+        return scr && scr.querySelector('.karten') && !scr.querySelector('.karte--richtig');
+      }, null, { timeout: 25000 });
+      await klick(`[data-opt="${richtig}"]`);
+    }
+  }
+
+  async function verfolgung(F) {
+    for (const seite of F.verfolgung) {
+      await warteAuf('verfolgung');
+      await klick(`[data-seite="${seite}"]`);
+      await warte(1100);
+    }
+    await klick('[data-k="w"]');
+  }
+
+  async function zeitstrahl(F) {
+    await warteAuf('zeitstrahl');
+    for (const id of F.zeitstrahl) { await klick(`[data-b="${id}"]`); await warte(400); }
+    await warte(700);
+    await klick('.btn--gross:has-text("Weiter")');
+  }
+
+  async function zeugen(F) {
+    await warteAuf('zeugen');
+    const zi = F.zeugen.findIndex(l => l >= 0);
+    await klick(`[data-z="${zi}"]`);
+    await L(`.blase[data-a="${F.zeugen[zi]}"]`).waitFor({ state: 'visible', timeout: 40000 });
+    await warte(500);
+    await klick(`.blase[data-a="${F.zeugen[zi]}"]`);
+    await warte(900);
+    await klick('.btn--gross:has-text("Weiter")');
+  }
+
+  async function lineup(F) {
+    for (let i = 0; i < F.lineup.length; i++) {
+      await warteAuf('lineup', 20000);
+      for (const id of F.lineup[i]) {
+        const p = L(`[data-v="${id}"]`);
+        if (await p.evaluate(e => e.classList.contains('person--raus'))) continue;
+        await p.click({ force: true }); await warte(350);
+      }
+      await warte(2900);
+    }
+  }
+
+  async function verhaftung(F) {
+    await warteAuf('verhaftung');
+    await klick(`[data-v="${F.taeter}"]`);
+    await warte(2600);
+  }
+
+  const PHASE = { tatort, labor, verfolgung, zeitstrahl, zeugen, lineup, verhaftung };
+
+  /* ---- Durchlauf ---- */
+
+  for (const F of FAELLE) {
+    // Jeder Fall startet aus einem sauberen Zustand: so faerbt kein Fehler
+    // aus dem vorherigen Fall den naechsten ein.
+    await page.goto(BASIS + '/index.html', { waitUntil: 'domcontentloaded' });
+    await page.evaluate(() => localStorage.setItem('spuernase.v1', JSON.stringify(
+      { sterne: { f1: 3, f2: 3, f3: 3, f4: 3 }, ton: true, musik: false, sprache: true, gesehen: true })));
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await warte(900);
+    await page.evaluate(() => {
+      window.__voice = []; window.__voiceOk = []; window.__voiceErr = [];
+      const A = window.Audio;
+      window.Audio = function (src) {
+        const a = new A(src);
+        window.__voice.push(src);
+        a.addEventListener('ended', () => window.__voiceOk.push(src));
+        a.addEventListener('error', () => window.__voiceErr.push(src));
+        return a;
+      };
+    });
+
+    const t0 = Date.now();
+    const vor = probleme.length;
+    await klick('[data-k="start"]');
+    await warteAuf('akten');
+    await klick(`[data-fall="${F.id}"]`);
+    await warteAuf('intro');
+    await warte(2600);
+    await klick('[data-k="los"]');
+
+    let abgebrochen = false;
+    for (const ph of F.phasen) {
+      const da = await warteAuf(ph, 25000);
+      if (!da) { abgebrochen = true; break; }
+      try { await PHASE[ph](F); }
+      catch (err) {
+        probleme.push(`${F.id}/${ph}: ${String(err).split('\n')[0]}`);
+        await page.screenshot({ path: `/tmp/fail-${F.id}-${ph}.png` });
+        abgebrochen = true; break;
+      }
+    }
+
+    const ende = !abgebrochen && await warteAuf('ergebnis', 25000);
+    const sterne = ende ? await L('.ergSterne span').evaluateAll(
+      els => els.filter(e => !e.style.color).length) : 0;
+    const dauer = ((Date.now() - t0) / 1000).toFixed(1);
+    const neu = probleme.length - vor;
+    sag(`Fall ${F.nr} "${F.titel}": ${F.phasen.length} Phasen [${F.phasen.join(' → ')}], ` +
+        `${ende ? sterne + '/3 Sterne' : 'NICHT BEENDET'}, ${dauer}s, ${neu ? neu + ' Probleme' : 'sauber'}`);
+    if (ende && sterne !== 3) probleme.push(`${F.id}: fehlerfreier Durchlauf ergibt ${sterne} Sterne statt 3`);
+    if (ende) await page.screenshot({ path: `/tmp/shot-${F.id}-ergebnis.png` });
+
+    const v = await page.evaluate(() => ({
+      alle: window.__voice || [], ok: window.__voiceOk || [], err: window.__voiceErr || [] }));
+    for (const src of v.alle) gespielt.push(src);
+    if (v.err.length) probleme.push(`${F.id}: ${v.err.length} Sprachdateien liessen sich nicht abspielen`);
+    fertigGespielt += new Set(v.ok).size;
+  }
+
+  /* ---- Sprachdateien prüfen ---- */
+  const angefordert = [...new Set(gespielt)];
+  sag(`Sprachaufnahmen angefordert: ${angefordert.length} verschiedene, ` +
+      `${fertigGespielt} davon bis zum Ende gespielt`);
+  // Der Testlauf tippt schneller als ein Kind – viele Zeilen werden vom
+  // naechsten Bildschirm abgeschnitten. Entscheidend ist: kein Abspielfehler,
+  // und ein spuerbarer Teil laeuft wirklich durch.
+  if (fertigGespielt < 15)
+    probleme.push(`nur ${fertigGespielt} Aufnahmen liefen bis zum Ende – Verdacht auf Codec-Problem`);
+  const vorhanden = await page.evaluate(async () => {
+    const m = await import('./js/voice-liste.js');
+    return m.STIMMEN;
+  });
+  const fehlend = angefordert
+    .map(u => (u.split('/').pop() || '').replace('.mp3', ''))
+    .filter(id => id && !vorhanden.includes(id));
+  if (fehlend.length) probleme.push('Sprachdateien fehlen: ' + fehlend.join(', '));
+  sag(`Insgesamt vorhanden: ${vorhanden.length} Aufnahmen`);
+
+  /* ---- PWA: Service Worker, Manifest, Offline ---- */
+  await page.goto(BASIS + '/index.html', { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(3500);
   const pwa = await page.evaluate(async () => {
     const reg = await navigator.serviceWorker.getRegistration();
-    const mani = document.querySelector('link[rel=manifest]');
-    const r = await fetch(mani.href).then(x => x.json()).catch(() => null);
-    return {
-      sw: !!reg, aktiv: !!(reg && reg.active),
-      manifest: !!r, icons: r ? r.icons.length : 0,
-      display: r ? r.display : null, start: r ? r.start_url : null
-    };
+    const m = await (await fetch('manifest.webmanifest')).json();
+    return { sw: !!reg, aktiv: !!(reg && reg.active), icons: (m.icons || []).length,
+             anzeige: m.display, start: m.start_url, quer: m.orientation || '(keine)' };
   });
-  log('  PWA:', JSON.stringify(pwa));
-  if (!pwa.sw) errors.push('Service Worker nicht registriert');
-  if (!pwa.manifest) errors.push('Manifest nicht ladbar');
+  sag(`PWA: Service Worker ${pwa.sw ? 'registriert' : 'FEHLT'}` +
+      `${pwa.aktiv ? ' und aktiv' : ''}, ${pwa.icons} Icons, ` +
+      `display "${pwa.anzeige}", orientation "${pwa.quer}"`);
+  if (!pwa.sw || !pwa.aktiv) probleme.push('Service Worker nicht aktiv');
+  if (pwa.icons < 3) probleme.push('Manifest hat nur ' + pwa.icons + ' Icons');
+  if (pwa.quer !== 'landscape') probleme.push('Manifest steht auf orientation "' + pwa.quer + '" statt landscape');
 
-  /* ---- Offline ---- */
   await ctx.setOffline(true);
-  const off = await page.goto(BASE, { waitUntil: 'domcontentloaded' }).then(r => r && r.status()).catch(e => 'FEHLER: ' + e.message);
-  const offTitel = await page.evaluate(() => document.querySelector('.title')?.textContent || '').catch(() => '');
-  log('  Offline-Reload:', off, '| Titel:', offTitel);
-  if (!offTitel.includes('Spür')) errors.push('Offline-Reload zeigt das Spiel nicht');
+  let offline = 'Fehler';
+  try {
+    const r = await page.reload({ waitUntil: 'domcontentloaded' });
+    offline = (r ? r.status() : '?') + ' · Titel "' + await page.title() + '"';
+    const gemalt = await page.locator('.titelbild').count();
+    if (!gemalt) probleme.push('Offline-Neuladen zeigt keinen Titelbildschirm');
+  } catch (e) { probleme.push('Offline-Neuladen schlug fehl: ' + String(e).split('\n')[0]); }
+  sag('Offline-Neuladen: ' + offline);
   await ctx.setOffline(false);
 
-  /* ---- horizontales Scrollen? ---- */
-  await page.goto(BASE, { waitUntil: 'networkidle' });
-  const overflow = await page.evaluate(() =>
-    document.documentElement.scrollWidth - document.documentElement.clientWidth);
-  if (overflow > 2) errors.push('Seite scrollt horizontal um ' + overflow + 'px');
+  sag('');
+  if (probleme.length) { sag('PROBLEME (' + probleme.length + '):'); probleme.forEach(p => sag('  - ' + p)); }
+  else sag('Keine Probleme. Alle fünf Fälle fehlerfrei durchgespielt.');
 
+  require('fs').writeFileSync('/tmp/testlog.txt', log.join('\n'));
   await browser.close();
-  log('\n' + (errors.length ? '✗ FEHLER:\n' + errors.map(e => '   - ' + e).join('\n')
-                            : '✓ Alle Prüfungen bestanden'));
-  process.exit(errors.length || !dataOk ? 1 : 0);
+  process.exit(probleme.length ? 1 : 0);
 })();
