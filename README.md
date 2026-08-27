@@ -49,6 +49,9 @@ am Ende flutet Blaulicht den Raum.
   geraten: ein Spracherkenner hört jede Variante ab
 - **Aussprache:** eigenes Wörterbuch (`tools/aussprache.py`) korrigiert, was
   espeak an Schweizer Wörtern verhaut — «Znüni» wurde sonst zu «Zett-Nüni»
+- **Regie:** jede Zeile bekommt aus `tools/regie.py` eine Anweisung — Färbung,
+  Tempo, Lautheit, Tonhöhe je nach Lage. «Fall gelöst» klingt anders als «Es ist
+  dunkel». Ohne das lesen sich alle 135 Zeilen gleich
 - **Ton:** Effekte, Kulissen und Musik vollständig über die WebAudio-API
   synthetisiert. Die Klangbetten der Kulissen (`js/kulisse.js`) werden als
   Sample mit tausenden Einzelereignissen ausgerechnet — Regen besteht aus
@@ -78,6 +81,8 @@ assets/portraits/       28 Figurenporträts
 assets/voice/           135 Sprachaufnahmen (MP3)
 assets/icons/           App-Icons
 tools/                  Entwicklungswerkzeuge (nicht Teil der App)
+  regie.py              Tonfall je Zeile: Färbung, Tempo, Lautheit, Tonhöhe
+  aussprache.py         Wörterbuch für das, was espeak falsch liest
 docs/                   Konzept, Arbeitsprotokoll, Testbericht
 ```
 
@@ -89,7 +94,11 @@ node tools/test.js           # spielt alle fünf Fälle automatisch durch
 node tools/audiotest.js      # misst jeden Klang, die Kulissen und den Stummschalter
 python3 tools/aussprachetest.py   # prüft das Aussprachewörterbuch
 python3 tools/hoerprobe.py        # hört jede Aufnahme ab und vergleicht mit dem Text
+python3 tools/lebendigkeit.py     # misst Sprechmelodie und Abwechslung
 ```
+
+Die letzten beiden ziehen absichtlich in entgegengesetzte Richtungen: wer nur
+auf Verständlichkeit optimiert, bekommt eine flache Stimme.
 
 `tools/preview.html` zeigt alle prozeduralen Beweismittel nebeneinander –
 praktisch, wenn man an `js/art.js` schraubt.
