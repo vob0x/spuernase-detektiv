@@ -1,6 +1,6 @@
 /* Service Worker – volles Precache, damit das Spiel offline läuft. */
 
-const VERSION = 'spuernase-v6';
+const VERSION = 'spuernase-v7';
 const ASSETS = [
   './',
   'index.html',
