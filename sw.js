@@ -1,6 +1,6 @@
 /* Service Worker – volles Precache, damit das Spiel offline läuft. */
 
-const VERSION = 'spuernase-v9';
+const VERSION = 'spuernase-v10';
 const ASSETS = [
   './',
   'index.html',
@@ -26,6 +26,8 @@ const ASSETS = [
   'assets/img/tatort-5.webp',
   'assets/img/gabel-2.webp',
   'assets/img/gabel-5.webp',
+  'assets/img/labor.webp',
+  'assets/img/buero.webp',
   'assets/portraits/aaron.webp',
   'assets/portraits/ammann.webp',
   'assets/portraits/baertschi.webp',
