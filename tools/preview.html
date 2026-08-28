@@ -22,3 +22,32 @@ document.getElementById('w').innerHTML = items.map(([n,s])=>
    <div style="height:190px;display:grid;place-items:center">${s.replace('<svg','<svg style="max-height:180px;max-width:100%"')}</div>
    <div style="color:#9db3cd;font-size:11px;text-align:center;margin-top:4px">${n}</div></div>`).join('');
 </script>
+
+<h2>Merkmalszeichen der Gegenüberstellung</h2>
+<p>Jeder <em>Wert</em> hat sein eigenes Bild – nicht das Feld. Verglichen wird
+Bild gegen Bild, ohne Lesen. Dargestellt in der Grösse, in der sie im Spiel
+über den Köpfen stehen (54 px) und doppelt so gross.</p>
+<div id="merkmale" class="reihe"></div>
+<script type="module">
+  import * as art from '../js/art.js';
+  const PROBEN = [
+    ['sohle','Zickzack'],['sohle','Punkte'],['sohle','Wellen'],['sohle','Stollen'],
+    ['abdruck','Wirbel'],['abdruck','Bogen'],['abdruck','Schleife'],
+    ['velo','Mountainbike'],['velo','Rennvelo'],['velo','Trottinett'],
+    ['schuh','36'],['schuh','38'],['schuh','40'],
+    ['schrift','links'],['schrift','rechts'],
+    ['farbe','Moosgrün'],['farbe','Tannengrün'],
+    ['wolle','rot'],['wolle','nein'],['haar','braun'],['haar','blond'],
+    ['schluessel','ja'],['schluessel','nein'],
+    ['guetzli','ja'],['guetzli','nein'],
+    ['ort','Dorf'],['ort','Wald'],['ort','Zug'],
+  ];
+  document.getElementById('merkmale').innerHTML = PROBEN.map(([f,w]) =>
+    `<figure style="margin:0 14px 18px 0;text-align:center">
+       <div style="display:flex;gap:8px;align-items:flex-end;justify-content:center">
+         <span style="width:54px;height:54px;display:block">${art.merkmal(f,w)}</span>
+         <span style="width:108px;height:108px;display:block">${art.merkmal(f,w)}</span>
+       </div>
+       <figcaption style="font:12px system-ui;margin-top:5px">${f} · ${w}</figcaption>
+     </figure>`).join('');
+</script>
