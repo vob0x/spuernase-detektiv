@@ -260,3 +260,45 @@ verbuchen.
   einem Jungen und nicht nach einer jungen Frau, entscheidet das Ohr.
 - **Ob das Spiel jetzt zäh wirkt.** Die Aufnahmen sind im Schnitt 63 % länger.
   Kein Messwert sagt, ob ein Kind das als ruhiger oder als langsamer erlebt.
+
+## 6. Sprachwiedergabe — `node tools/stimmtest.js`
+
+Der einzige Test hier, der einen Fehler findet, bei dem **alles andere grün
+ist**: das Spiel läuft fehlerfrei durch, es klingt nur kaputt.
+
+Gemessen wird nicht «lief es durch», sondern für jede abgespielte Aufnahme, ob
+sie ihr Ende erreicht hat oder vorher pausiert wurde. Dazu, ob zwei Zeilen
+gleichzeitig liefen (die 120 ms Ausblendung sind erlaubt), und ob die Schlange
+eine Zeile verschluckt hat.
+
+Der Ablauf ist bewusst gehetzt: drei Spuren im Sekundentakt anklicken, danach
+zwei Zeilen mit 300 ms Abstand direkt über das Modul auslösen. Kein Kind spielt
+so — aber genau so fällt der Fehler auf.
+
+```
+7 Zeilen gestartet, 6 zu Ende gesprochen, 0 abgebrochen
+Reihenfolge: g-tatort → f1-intro → f1-s1 → f1-s2 → f1-s3 → g-alle → f1-intro
+(1 Anleitung wich dem Kind: g-tatort)
+
+✓ Keine Zeile wurde abgeschnitten, keine zwei liefen gleichzeitig
+```
+
+### Gegenprobe
+
+Ein Test, der nicht durchfallen kann, ist keiner. Mit der alten `voice.js`
+zurückgespielt:
+
+```
+8 Zeilen gestartet, 2 zu Ende gesprochen, 5 abgebrochen
+  f1-intro  bei 1.6s von 6.8s
+  f1-s1     bei 1.1s von 3.7s
+  f1-s2     bei 1.0s von 4.6s
+  f1-s3     bei 0.8s von 4.8s
+  f1-intro  bei 0.2s von 6.8s
+✗ Zeilen schneiden einander ab
+```
+
+Der erste Anlauf des Tests meldete «alles gut», weil er nur Abbrüche zählte und
+das natürliche Ende gar nicht mitschrieb: null Abbrüche bei null gemessenen
+Zeilen. Er hätte auch die kaputte Fassung durchgewinkt. Deshalb bricht er jetzt
+ab, wenn weniger als fünf Zeilen gespielt wurden.

@@ -446,3 +446,77 @@ Text» nicht eingehalten ist, und das soll nicht untergehen.
 
 Nebenbei behoben: der RAUS-Stempel klebte nach dem Umbau auf den Tafeln statt
 auf dem Gesicht, und lange Namen brachen um und verschoben die ganze Karte.
+
+## Runde 8 – Sprachzeilen reihen sich an
+
+**Auftrag.** «Wenn mehrere Audiofiles feuern (z.B. wenn die letzte Spur
+gefunden wurde), übersteuert das letzte Audio das vorhergehende – letzteres
+bricht ab.»
+
+### Die Ursache stand in einer Zeile
+
+`sprich()` begann mit `stopp()`. Wer zuletzt spricht, schneidet dem vorigen das
+Wort ab. Die Stellen, an denen zwei Dinge gleichzeitig passieren:
+
+| Stelle | Abstand | Länge der Zeile |
+|---|---|---|
+| letzte Spur gefunden → «Alle Spuren gefunden» | 900 ms | 3,7–4,8 s |
+| Verfolgung: «Genau richtig» → nächster Schritt | 620 ms | 2,4 s |
+| Labor: Ergebnis → nächste Aufgabe | 2200 ms | 4,5 s |
+| Fallende: «Drei Sterne» → «Du wirst befördert» | 900 ms | 2,1 s |
+
+Die Wartezeiten stammen aus der Piper-Zeit, als eine Zeile im Schnitt 2,86
+Sekunden dauerte. Mit Gemini sind es 4,65. Der Fehler war immer da und ist nur
+sichtbarer geworden – das gehört zur Ehrlichkeit dazu: er ist eine Nebenwirkung
+von Runde 6, die mir dort nicht aufgefallen ist.
+
+### Drei Arten von Zeilen
+
+Eine reine Warteschlange wäre falsch gewesen. Nicht jede Unterbrechung ist ein
+Fehler:
+
+* **Inhalt** (Spurentexte, Fragen, Aussagen, Auflösungen) – reiht sich an.
+* **Anleitung** («Such den Tatort ab») – sagt, was zu tun ist. Sobald das Kind
+  es tut, ist sie überholt und weicht.
+* **Rückmeldung** («Genau richtig», «Alle Spuren gefunden») – gehört zur
+  Handlung, nicht zum Bild, und überlebt darum den Bildschirmwechsel.
+
+Dazu `{ sofort: true }` für die drei Fälle, die wirklich unterbrechen müssen:
+falsche Antwort, «nochmal vorlesen», Sprachausgabe abschalten. Unterbrochen
+wird mit 120 ms Ausblendung – ein harter Schnitt knackt.
+
+Der Hund bellt jetzt nicht mehr in eine laufende Zeile hinein.
+
+### Der Test hat einen Fehler von mir gefunden
+
+Der erste Entwurf der Schlange begrenzte sie auf drei wartende Zeilen und warf
+die älteste weg. Im Messlauf lief die Anleitung «Such den Tatort ab» noch,
+während das Kind schon drei Spuren fand – die Zeile zur **ersten** Spur fiel
+hinten aus der Schlange und war weg. Das Kind tippt und hört nichts: schlimmer
+als der Fehler, den ich reparieren wollte.
+
+Behoben durch die Kategorie «Anleitung»: sie weicht und belegt keinen Platz.
+
+### Und der Test hatte selbst einen
+
+Der erste Anlauf meldete «✓ keine Zeile abgeschnitten» – bei null gemessenen
+Zeilen. Er zählte nur Abbrüche über `pause()`, und ein natürliches Ende löst
+kein `pause()` aus. Er hätte auch die kaputte Fassung durchgewinkt.
+
+Jetzt schreibt er das `ended`-Ereignis mit und bricht ab, wenn weniger als fünf
+Zeilen gespielt wurden. Gegengeprüft mit der alten `voice.js`: 5 von 8 Zeilen
+abgeschnitten, Test fällt durch. Erst damit ist er etwas wert.
+
+### Was es kostet
+
+| | vorher | jetzt |
+|---|---|---|
+| Zeilen zu Ende gesprochen (Spieltest) | 22 | **51** |
+| Fall 1 Durchlauf | 17,9 s | 27,7 s |
+| Fall 4 Durchlauf | 38,0 s | 60,3 s |
+
+Mehr als doppelt so viele Zeilen werden zu Ende gesprochen – und das Spiel
+dauert länger, weil es vorher Text weggeworfen hat. Ein Kind spielt ohnehin
+langsamer als der Testklick, aber an den Übergängen wartet es jetzt auf das
+Satzende. Der «Weiter»-Knopf erscheint sofort und beendet die Schlange, wer
+mag, klickt weiter. Ob das reicht, sagt kein Messwert.
