@@ -763,3 +763,136 @@ export function merkmal(feld, wert, feldIcon) {
     <text x="32" y="58" font-size="13" font-weight="800" fill="${M_LINIE}"
       text-anchor="middle" font-family="ui-rounded, system-ui, sans-serif">${wert}</text>`);
 }
+
+/* ======================== SPUREN IN DER SZENE ========================
+   Bisher lagen die zu vergleichenden Reifenspuren auf zwei Karten vor einem
+   abgedunkelten Foto — und ragten dabei 28 Pixel unter die Bühne hinaus, das
+   untere Drittel des Profils war gar nicht zu sehen. Vor allem aber sah der
+   Bildschirm nicht aus wie eine Verfolgung, sondern wie ein Quiz mit Tapete.
+
+   Jetzt liegen die Spuren **im Weg**, perspektivisch nach hinten schmaler
+   werdend. Gezeichnet wird weiter prozedural: Probe und richtige Antwort
+   müssen pixelgleich sein, und das kann keine Bilderzeugung zusichern —
+   im Versuch mit Veo waren die Reifenspuren im Kies überhaupt nicht mehr
+   zu erkennen.                                                            */
+
+/* Punkt und Richtung auf einer quadratischen Bézierkurve. */
+function bahnPunkt(a, s, b, t) {
+  const u = 1 - t;
+  const x = u * u * a[0] + 2 * u * t * s[0] + t * t * b[0];
+  const y = u * u * a[1] + 2 * u * t * s[1] + t * t * b[1];
+  const dx = 2 * u * (s[0] - a[0]) + 2 * t * (b[0] - s[0]);
+  const dy = 2 * u * (s[1] - a[1]) + 2 * t * (b[1] - s[1]);
+  const l = Math.hypot(dx, dy) || 1;
+  return { x, y, nx: -dy / l, ny: dx / l };
+}
+
+/* Eine Fahrspur, die in die Tiefe läuft. `von` ist vorne (breit), `nach`
+   hinten (schmal); `stuetz` biegt die Kurve. */
+export function spurBahn(typ, von, stuetz, nach, opt = {}) {
+  const schritte = opt.schritte || 46;
+  const breitVorn = opt.breitVorn || 54;
+  const breitHinten = opt.breitHinten || 9;
+  const farbe = opt.farbe || '#6b5c44';
+  let p = '';
+
+  const quer = (P, halb, versatz, dicke) => {
+    const x1 = P.x + P.nx * (versatz - halb), y1 = P.y + P.ny * (versatz - halb);
+    const x2 = P.x + P.nx * (versatz + halb), y2 = P.y + P.ny * (versatz + halb);
+    return `<path d="M${x1.toFixed(1)} ${y1.toFixed(1)} L${x2.toFixed(1)} ${y2.toFixed(1)}"
+      stroke-width="${dicke.toFixed(2)}"/>`;
+  };
+
+  for (let i = 0; i <= schritte; i++) {
+    const t = i / schritte;
+    const P = bahnPunkt(von, stuetz, nach, t);
+    const b = breitVorn + (breitHinten - breitVorn) * t;   // Breite in der Tiefe
+    const d = 1.2 + (1 - t) * 4.6;                          // Strichstärke
+    if (typ === 'rennvelo') {
+      // Schmal und fein: ein durchgehendes dünnes Band, kaum Profil.
+      p += quer(P, b * 0.055, 0, d * 0.85);
+    } else if (typ === 'mountainbike') {
+      // Grobe Stollen: kurze, klar getrennte Klötze, links und rechts versetzt.
+      if (i % 3 === 0) p += quer(P, b * 0.13, -b * 0.26, d * 2.0);
+      if (i % 3 === 1) p += quer(P, b * 0.13, +b * 0.26, d * 2.0);
+    } else if (typ === 'trottinett') {
+      // Zwei schmale Bänder, weit auseinander, ohne Profil dazwischen.
+      p += quer(P, b * 0.045, -b * 0.30, d * 0.8);
+      p += quer(P, b * 0.045, +b * 0.30, d * 0.8);
+    } else {
+      // Wellenprofil (Kinderwagen): ein breites Band, das schlängelt.
+      if (i % 2 === 0) p += quer(P, b * 0.20, Math.sin(t * 26) * b * 0.16, d * 1.3);
+    }
+  }
+  return `<g fill="none" stroke="${farbe}" stroke-linecap="round"
+    opacity="${opt.deckung != null ? opt.deckung : 0.72}">${p}</g>`;
+}
+
+/* Rundes Lupenabzeichen: zeigt das Profil gross genug zum Vergleichen,
+   ohne den Weg zu verdecken. */
+export function lupe(typ, groesse = 96) {
+  const inner = spurBahn(typ, [50, 96], [50, 50], [50, 4],
+    { schritte: 26, breitVorn: 58, breitHinten: 40, deckung: 0.9, farbe: '#3a3226' });
+  return `<svg xmlns="${NS}" viewBox="0 0 100 100" width="${groesse}" height="${groesse}"
+    aria-hidden="true">
+    <defs><clipPath id="lu${typ}"><circle cx="50" cy="50" r="44"/></clipPath></defs>
+    <circle cx="50" cy="50" r="44" fill="#e6dcc6"/>
+    <g clip-path="url(#lu${typ})">${inner}</g>
+    <circle cx="50" cy="50" r="44" fill="none" stroke="#f7f2e4" stroke-width="7"/>
+    <circle cx="50" cy="50" r="47.5" fill="none" stroke="#3a3226" stroke-width="2.5" opacity=".5"/>
+  </svg>`;
+}
+
+/* Pfotenfährte in die Tiefe: dieselbe Idee wie spurBahn, aber mit einzelnen
+   Abdrücken links und rechts der Laufrichtung. */
+const PFOTE = {
+  hundGross: { r: 9.5, zehen: 4, kralle: true,  schritt: 0.115, versatz: 0.30 },
+  hundKlein: { r: 6.0, zehen: 4, kralle: true,  schritt: 0.085, versatz: 0.26 },
+  katze:     { r: 5.2, zehen: 4, kralle: false, schritt: 0.075, versatz: 0.22 },
+  vogel:     { r: 4.6, zehen: 3, kralle: true,  schritt: 0.065, versatz: 0.16 },
+};
+
+export function pfotenBahn(typ, von, stuetz, nach, opt = {}) {
+  const k = PFOTE[typ] || PFOTE.hundGross;
+  const breitVorn = opt.breitVorn || 54;
+  const breitHinten = opt.breitHinten || 9;
+  let p = '', i = 0;
+  for (let t = 0; t <= 1.0001; t += k.schritt, i++) {
+    const P = bahnPunkt(von, stuetz, nach, Math.min(t, 1));
+    const tiefe = 1 - t * 0.82;                    // hinten kleiner
+    const b = breitVorn + (breitHinten - breitVorn) * t;
+    const seite = (i % 2 ? 1 : -1) * b * k.versatz;
+    const cx = P.x + P.nx * seite, cy = P.y + P.ny * seite;
+    p += `<g transform="rotate(${(Math.atan2(P.ny, P.nx) * 180 / Math.PI + 90).toFixed(1)} ${cx.toFixed(1)} ${cy.toFixed(1)})">`
+       + pfotenPfad(cx, cy, k.r * tiefe, k.zehen, k.kralle) + `</g>`;
+  }
+  return `<g fill="${opt.farbe || '#6b5c44'}" opacity="${opt.deckung != null ? opt.deckung : 0.75}">${p}</g>`;
+}
+
+/* Lupe für Pfotenfährten. */
+export function lupePfote(typ, groesse = 96) {
+  const k = PFOTE[typ] || PFOTE.hundGross;
+  const inner = `<g fill="#3a3226">
+    <g transform="translate(0,-6)">${pfotenPfad(34, 34, k.r * 1.7, k.zehen, k.kralle)}</g>
+    <g transform="translate(0,-6)">${pfotenPfad(68, 62, k.r * 1.7, k.zehen, k.kralle)}</g></g>`;
+  return `<svg xmlns="${NS}" viewBox="0 0 100 100" width="${groesse}" height="${groesse}"
+    aria-hidden="true">
+    <defs><clipPath id="lp${typ}"><circle cx="50" cy="50" r="44"/></clipPath></defs>
+    <circle cx="50" cy="50" r="44" fill="#e6dcc6"/>
+    <g clip-path="url(#lp${typ})">${inner}</g>
+    <circle cx="50" cy="50" r="44" fill="none" stroke="#f7f2e4" stroke-width="7"/>
+    <circle cx="50" cy="50" r="47.5" fill="none" stroke="#3a3226" stroke-width="2.5" opacity=".5"/>
+  </svg>`;
+}
+
+/* Einheitlicher Zugang: liefert Fährte und Lupe für beide Spurenarten. */
+export function faehrte(spec, von, stuetz, nach, opt) {
+  if (!spec) return '';
+  return spec.art === 'tierspur'
+    ? pfotenBahn(spec.v, von, stuetz, nach, opt)
+    : spurBahn(spec.v, von, stuetz, nach, opt);
+}
+export function faehrteLupe(spec, groesse) {
+  if (!spec) return '';
+  return spec.art === 'tierspur' ? lupePfote(spec.v, groesse) : lupe(spec.v, groesse);
+}

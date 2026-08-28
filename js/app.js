@@ -85,6 +85,39 @@ function schrittPips() {
     `<span class="pip ${i < E.idx ? 'pip--done' : i === E.idx ? 'pip--now' : ''}"></span>`).join('');
 }
 
+/* Bedienung auf der Szene statt Kopfleiste darueber.
+
+   Die braune Holzleiste mit Titel und Untertitel nahm oben 60 Pixel weg und
+   erklaerte in Worten, was das Bild ohnehin zeigt: «Tatort – Bahnhof
+   Bärenmoos». Sie ist weg. Was bleibt, sind vier feste Plaetze, auf allen
+   Bildschirmen gleich:
+
+     oben links    was gesucht wird (nur wo es das gibt)
+     oben rechts   Notizbuch
+     unten links   zurueck
+     unten Mitte   Fortschritt
+     unten rechts  nochmal hoeren
+
+   Wer immer am selben Ort sucht, muss nicht lesen, wo etwas steht. */
+function bedien(opts = {}) {
+  return `
+    ${opts.zurueck !== false ? `<button class="rund knopf knopf--zurueck" data-k="zurueck"
+      aria-label="Zurück">${art.icon('pfeilLinks', '#23272f', 22)}</button>` : ''}
+    ${opts.notiz ? `<button class="rund knopf knopf--notiz" data-k="notiz"
+      aria-label="Notizbuch">${art.icon('zettel', '#23272f', 22)}</button>` : ''}
+    ${opts.sage ? `<button class="rund knopf knopf--hoer" data-sage="${opts.sage}"
+      aria-label="Nochmal hören">${hoerIcon}</button>` : ''}
+    ${opts.pips ? `<div class="fortschritt">${opts.pips}</div>` : ''}`;
+}
+
+/* Der gesprochene Satz steht nur dann noch geschrieben da, wenn er nicht
+   gesprochen werden kann – Ton aus oder Vorlesen aus. Sonst waere das Spiel
+   ohne Ton unspielbar, und das waere ein zu hoher Preis fuer einen
+   aufgeraeumten Bildschirm. */
+function stillText(text, id, hell) {
+  return (spracheAn() && soundOn()) ? '' : sageBox(text, id, hell);
+}
+
 /* Sprechzeile unten: Text sichtbar, Stimme dazu */
 function sageBox(text, id, hell) {
   return `<div class="sage ${hell ? 'sage--hell' : ''}" data-sage="${id || ''}">
@@ -97,7 +130,7 @@ function sageBox(text, id, hell) {
 function sageVerbinden(wurzel) {
   const box = $('[data-sage]', wurzel);
   if (!box || !box.dataset.sage) return;
-  const hoer = $('.sage__hoer', box);
+  const hoer = $('.sage__hoer', box) || (box.classList.contains('rund') ? box : null);
   // Die Kennung wird erst beim Klick gelesen: der Kasten wechselt seinen Text.
   (hoer || box).addEventListener('click', () => { unlock(); sprich(box.dataset.sage, { sofort: true }); });
   const ab = beiWechsel((l) => hoer && hoer.classList.toggle('laut', l === box.dataset.sage));
@@ -295,14 +328,14 @@ function scrTatort() {
       ${marker}
       <div class="lupe ${lampe ? 'lupe--lampe' : ''}" id="lupe" style="left:50%;top:52%"></div>
     </div>
-    ${kopf('Tatort', F.ort, { notiz: true, schritte: schrittPips() })}
+    ${bedien({ notiz: true, sage: lampe ? 'g-dunkel' : 'g-tatort', pips: schrittPips() })}
     <div class="beweisleiste">
       ${F.spuren.map(sp => `<span class="bslot" data-slot="${sp.id}">
         ${art.icon(sp.icon, 'rgba(255,255,255,.4)', 27)}</span>`).join('')}
     </div>
-    ${sageBox(lampe ? 'Es ist dunkel. Leuchte mit der Taschenlampe.'
-                    : 'Zieh die Lupe über das Bild und such nach Spuren.',
-              lampe ? 'g-dunkel' : 'g-tatort')}`, 'scr--tatort');
+    ${stillText(lampe ? 'Es ist dunkel. Leuchte mit der Taschenlampe.'
+                      : 'Zieh die Lupe über das Bild und such nach Spuren.',
+                lampe ? 'g-dunkel' : 'g-tatort')}`, 'scr--tatort');
 
   wetterMachen($('#wetter', s), F.szene);
   // Die Zeile bleibt so lange stehen, wie sie gesprochen wird – mindestens aber
@@ -366,10 +399,17 @@ function scrTatort() {
       slot.innerHTML = art.icon(sp.icon, '#96690f', 27);
     }, 700);
 
+    // Der Textkasten steht nur noch da, wenn nicht gesprochen werden kann.
+    // Sonst traegt der Hoer-Knopf unten rechts die Kennung.
     const box = $('.sage', s);
-    box.classList.remove('sage--weg');
-    box.dataset.sage = `${F.id}-${sp.id}`;
-    $('.sage span:last-child', box).textContent = sp.name + ': ' + sp.sagt;
+    if (box) {
+      box.classList.remove('sage--weg');
+      box.dataset.sage = `${F.id}-${sp.id}`;
+      const zeile = $('.sage span:last-child', box);
+      if (zeile) zeile.textContent = sp.name + ': ' + sp.sagt;
+    }
+    const hoer = $('.knopf--hoer', s);
+    if (hoer) hoer.dataset.sage = `${F.id}-${sp.id}`;
     sageWeg(sprich(`${F.id}-${sp.id}`));
 
     if (E.gefunden.length === F.spuren.length) {
@@ -447,18 +487,18 @@ function scrLabor() {
   const zahl = a.typ !== 'vergleich';
   const karten = a.optionen.map((o, i) => zahl
     ? `<button class="karte karte--zahl" data-opt="${o.id}" style="animation-delay:${i * 80}ms">${esc(o.label)}</button>`
-    : `<button class="karte" data-opt="${o.id}" style="animation-delay:${i * 80}ms">
-         ${bildFuer(o)}<span>${esc(o.label)}</span></button>`).join('');
+    // Bei Bildkarten faellt die Beschriftung weg: verglichen wird das Muster,
+    // nicht der Buchstabe. Bei Zahlkarten ist die Zahl der Inhalt und bleibt.
+    : `<button class="karte" data-opt="${o.id}" style="animation-delay:${i * 80}ms"
+         aria-label="${esc(o.label)}">${bildFuer(o)}</button>`).join('');
 
   const s = zeige(`
-    ${kopf('Spurenlabor', `Aufgabe ${E.laborIdx + 1} von ${F.labor.length}`,
-           { notiz: true, schritte: schrittPips() })}
-    <div class="laborProbe">
-      ${bildFuer(a.probe || a.bild)}
-      <b>${esc((a.probe && a.probe.label) || 'Vom Tatort')}</b>
-    </div>
+    ${bedien({ notiz: true, sage: `${F.id}-lab${E.laborIdx}-f`,
+               pips: F.labor.map((_, i) =>
+                 `<span class="pip ${i < E.laborIdx ? 'pip--done' : i === E.laborIdx ? 'pip--now' : ''}"></span>`).join('') })}
+    <div class="laborProbe">${bildFuer(a.probe || a.bild)}</div>
     <div class="karten ${zahl ? 'karten--zahl' : ''} ${a.optionen.length === 3 && !zahl ? 'karten--3' : ''}">${karten}</div>
-    ${sageBox(a.frage, `${F.id}-lab${E.laborIdx}-f`, true)}`);
+    ${stillText(a.frage, `${F.id}-lab${E.laborIdx}-f`, true)}`, 'scr--labor');
 
   sprich(`${F.id}-lab${E.laborIdx}-f`);
 
@@ -485,64 +525,123 @@ function scrLabor() {
 
 /* ================= VERFOLGUNG ================= */
 
+/* Die Verfolgung war ein Quiz mit Tapete: zwei Karten vor einem
+   abgedunkelten Foto, dazu Kopfleiste, Titel, Untertitel und ein schwarzer
+   Textkasten. Gemessen ragten die Karten 28 Pixel unter die Bühne hinaus –
+   das untere Drittel des Profils war gar nicht zu sehen.
+
+   Jetzt liegt die Szene ungeschnitten da, die Spuren liegen **im Weg** und
+   laufen perspektivisch nach hinten, und nach der richtigen Wahl fährt die
+   Kamera in den gewählten Ast weiter. Aus drei Fragen wird ein Weg.
+
+   Kein Titel, keine Kopfleiste, kein Textkasten: gesprochen wird sowieso,
+   und der Bildschirm gehört der Szene. Nur zwei runde Knöpfe bleiben —
+   zurück und nochmal hören. */
+
+/* Wo die beiden Fährten liegen. Bühnenmass 1000x480, vorne unten breit,
+   hinten an der Weggabel schmal. */
+const VF_BAHN = {
+  links:  { von: [318, 500], stuetz: [352, 320], nach: [452, 176] },
+  rechts: { von: [706, 500], stuetz: [714, 318], nach: [648, 168] },
+};
+const VF_SZENE = { f2: 'assets/img/gabel-2.webp', f5: 'assets/img/gabel-5.webp' };
+
 function scrVerfolgung() {
   const V = F.verfolgung;
   const schritt = V.schritte[E.verfIdx];
   if (!schritt) { weiter(); return; }
+  const szene = VF_SZENE[F.id] || F.bild;
+
+  const ast = (seite) => {
+    const b = VF_BAHN[seite];
+    return `<g class="vfAst" data-seite="${seite}">
+      ${art.faehrte(schritt[seite], b.von, b.stuetz, b.nach)}
+    </g>`;
+  };
+  const lupenKnopf = (seite) => {
+    const b = VF_BAHN[seite];
+    const P = seite === 'links' ? [372, 300] : [676, 296];
+    return `<button class="vfLupe vfLupe--${seite}" data-seite="${seite}"
+        style="left:${P[0]}px;top:${P[1]}px"
+        aria-label="Diese Spur wählen">${art.faehrteLupe(schritt[seite], 104)}</button>`;
+  };
 
   const s = zeige(`
-    <div class="verfolgung">
-      <div class="vfBoden"><img src="${F.bild}" alt="" onerror="this.remove()"></div>
-      <div class="vfWeg"></div>
-      <div class="vfRef">${bildFuer(V.referenz)}<b>Gesuchte Spur</b></div>
-      <div class="vfSchritte">${V.schritte.map((_, i) =>
+    <div class="vf">
+      <div class="vfKamera">
+        <img class="vfSzene" src="${szene}" alt="" onerror="this.style.opacity=0">
+        <svg class="vfSpuren" viewBox="0 0 1000 480" aria-hidden="true">
+          ${ast('links')}${ast('rechts')}
+        </svg>
+        ${lupenKnopf('links')}${lupenKnopf('rechts')}
+      </div>
+      <div class="vfSuch">
+        ${art.faehrteLupe(V.referenz, 92)}
+        <span class="vfSuch__ring"></span>
+      </div>
+      <button class="rund vfZurueck" data-k="zurueck" aria-label="Zurück">
+        ${art.icon('pfeilLinks', '#23272f', 22)}</button>
+      <button class="rund vfHoer" data-sage="${F.id}-verf-f" aria-label="Nochmal hören">
+        ${hoerIcon}</button>
+      <div class="vfPips">${V.schritte.map((_, i) =>
         `<span class="pip ${i < E.verfIdx ? 'pip--done' : i === E.verfIdx ? 'pip--now' : ''}"></span>`).join('')}</div>
-      <div class="vfWahl vfWahl--links" data-seite="links">
-        <span class="vfPfeil">${art.icon('pfeilLinks', '#3a2708', 38)}</span>
-        <span class="vfProbe">${bildFuer(schritt.links)}</span>
-      </div>
-      <div class="vfWahl vfWahl--rechts" data-seite="rechts">
-        <span class="vfPfeil">${art.icon('pfeilRechts', '#3a2708', 38)}</span>
-        <span class="vfProbe">${bildFuer(schritt.rechts)}</span>
-      </div>
-    </div>
-    ${kopf('Verfolgung', F.ort, { notiz: true, schritte: schrittPips() })}
-    ${sageBox(V.text, `${F.id}-verf-f`)}`);
+    </div>`, 'scr--vf');
 
-  if (E.verfIdx === 0) sprich(`${F.id}-verf-f`);
+  sprich(`${F.id}-verf-f`);
+
+  const kamera = $('.vfKamera', s);
+  let gesperrt = false;
 
   tippen(s, '[data-seite]', (el) => {
-    const probe = $('.vfProbe', el);
-    if (el.dataset.seite === schritt.richtig) {
-      probe.classList.add('vfProbe--richtig');
-      [0, 1, 2, 3].forEach(i => setTimeout(() => sfx.schritt(i), i * 190));
-      E.verfIdx++;
-      if (E.verfIdx < V.schritte.length) sprich('g-richtig');
-      setTimeout(() => {
-        if (E.verfIdx >= V.schritte.length) {
-          sfx.treffer();
-          const e = zeige(`
-            <div class="verfolgung"><div class="vfBoden"><img src="${F.bild}" alt=""></div>
-            <div class="vfWeg"></div></div>
-            ${kopf('Verfolgung', F.ort, { dunkel: false })}
-            <div style="position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);text-align:center">
-              <div class="stempel stempel--gut stempel--knall">Spur verfolgt</div>
-            </div>
-            <button class="btn btn--gross weiterBtn" data-k="w">Weiter</button>
-            ${sageBox(V.ziel, `${F.id}-verf-z`)}`);
-          sprich(`${F.id}-verf-z`);
-          tippen(e, '[data-k="w"]', () => { sfx.tap(); weiter(); });
-          sageVerbinden(e);
-        } else go(scrVerfolgung);
-      }, 620);
-    } else {
-      probe.classList.add('vfProbe--falsch');
+    if (gesperrt) return;
+    const seite = el.dataset.seite;
+    const gWahl = $(`.vfAst[data-seite="${seite}"]`, s);
+    const lupe = $(`.vfLupe--${seite}`, s);
+
+    if (seite !== schritt.richtig) {
+      lupe.classList.add('vfLupe--falsch');
       fehler('Das ist eine andere Spur.');
-      setTimeout(() => probe.classList.remove('vfProbe--falsch'), 900);
+      setTimeout(() => lupe.classList.remove('vfLupe--falsch'), 900);
+      return;
     }
+
+    gesperrt = true;
+    lupe.classList.add('vfLupe--richtig');
+    gWahl.classList.add('vfAst--gewaehlt');
+    [0, 1, 2, 3].forEach(i => setTimeout(() => sfx.schritt(i), i * 190));
+
+    // Kamerafahrt in den gewählten Ast. Der Drehpunkt wird auf das Ende der
+    // gewählten Fährte gelegt – dann bleibt genau dieser Punkt stehen und
+    // alles andere waechst um ihn herum. Das ist das Bild, das entsteht, wenn
+    // man auf etwas zugeht. Erst den Drehpunkt setzen, im naechsten Bild die
+    // Skalierung: sonst springt es.
+    const ende = VF_BAHN[seite].nach;
+    kamera.style.transformOrigin = `${ende[0] / 10}% ${ende[1] / 4.8}%`;
+    requestAnimationFrame(() => { kamera.style.transform = 'scale(1.85)'; });
+    setTimeout(() => $$('.vfLupe', s).forEach(l => l.classList.add('vfLupe--weg')), 260);
+
+    E.verfIdx++;
+    if (E.verfIdx < V.schritte.length) sprich('g-richtig');
+    setTimeout(() => {
+      if (E.verfIdx < V.schritte.length) { go(scrVerfolgung); return; }
+      sfx.treffer();
+      const e = zeige(`
+        <div class="vf">
+          <div class="vfKamera vfKamera--nah">
+            <img class="vfSzene" src="${szene}" alt="" onerror="this.style.opacity=0">
+          </div>
+          <div class="vfStempel"><div class="stempel stempel--gut stempel--knall">Spur verfolgt</div></div>
+          <button class="rund vfHoer" data-sage="${F.id}-verf-z" aria-label="Nochmal hören">
+            ${hoerIcon}</button>
+          <button class="btn btn--gross weiterBtn" data-k="w">Weiter</button>
+        </div>`, 'scr--vf');
+      sprich(`${F.id}-verf-z`);
+      tippen(e, '[data-k="w"]', () => { sfx.tap(); weiter(); });
+      sageVerbinden(e);
+    }, 1150);
   });
+
   tippen(s, '[data-k="zurueck"]', () => { sfx.zuschlag(); go(scrAkten); });
-  tippen(s, '[data-k="notiz"]', notizbuch);
   sageVerbinden(s);
 }
 
@@ -558,8 +657,8 @@ function scrZeitstrahl() {
     marken += `<span style="left:${pct(t)}%">${t}</span><i style="left:${pct(t)}%"></i>`;
 
   const s = zeige(`
-    ${kopf('Zeitstrahl', 'Tatzeit ' + uhr(Z.tatVon) + ' bis ' + uhr(Z.tatBis),
-           { notiz: true, schritte: schrittPips() })}
+    ${bedien({ notiz: true, sage: `${F.id}-zeit-f`, pips: schrittPips() })}
+    <div class="zsTatzeit">${uhr(Z.tatVon)}<span>–</span>${uhr(Z.tatBis)}</div>
     <div class="zsBox">
       <div class="zsSkala">${marken}
         <div class="zsFenster" style="left:${pct(Z.tatVon)}%;width:${pct(Z.tatBis) - pct(Z.tatVon)}%">
@@ -576,7 +675,7 @@ function scrZeitstrahl() {
           </span></div>`;
       }).join('')}
     </div>
-    ${sageBox(Z.text, `${F.id}-zeit-f`, true)}`);
+    ${stillText(Z.text, `${F.id}-zeit-f`, true)}`, 'scr--zeit');
 
   sprich(`${F.id}-zeit-f`);
   const offen = new Set(Z.raus.filter(id => !E.raus.includes(id)));
@@ -615,7 +714,7 @@ function scrZeugen() {
   const s = zeige(`
     <div class="szene"><img class="szene__bg" src="${F.bild}" alt="" style="filter:brightness(.45) saturate(.8)">
       <div class="szene__dunkel"></div></div>
-    ${kopf('Zeugen befragen', 'Eine Aussage kann nicht stimmen', { notiz: true, schritte: schrittPips() })}
+    ${bedien({ notiz: true, sage: 'g-zeuge', pips: schrittPips() })}
     <div class="blasen" id="blasen"></div>
     <div class="zeugenReihe">
       ${F.zeugen.map((z, i) => `<button class="zeuge" data-z="${i}" style="animation-delay:${i * 90}ms">
@@ -623,7 +722,7 @@ function scrZeugen() {
         <span class="zeuge__name">${esc(z.name)}<small>${esc(z.rolle)}</small></span>
       </button>`).join('')}
     </div>
-    ${sageBox('Tippe eine Person an und hör zu.', 'g-zeuge')}`, 'scr--zeugen');
+    ${stillText('Tippe eine Person an und hör zu.', 'g-zeuge')}`, 'scr--zeugen');
 
   // Die Anweisung verschwindet, sobald sie gelesen ist – darunter stehen die Namen.
   const sageWeg = () => { const b = $('.sage', s); if (b) b.classList.add('sage--weg'); };
@@ -713,15 +812,14 @@ function scrLineup() {
     <div class="lineup"><div class="wand"></div>
       <div class="reihe">${F.verdaechtige.map(v => personHtml(v, true, step)).join('')}</div>
     </div>
-    ${kopf('Gegenüberstellung', `Beweis ${E.lineupIdx + 1} von ${F.lineup.length}`,
-           { notiz: true, schritte: schrittPips() })}
-    <div class="beweiskarte" data-sage="${F.id}-lin${E.lineupIdx}-f">
+    ${bedien({ notiz: true, sage: `${F.id}-lin${E.lineupIdx}-f`,
+               pips: F.lineup.map((_, i) =>
+                 `<span class="pip ${i < E.lineupIdx ? 'pip--done' : i === E.lineupIdx ? 'pip--now' : ''}"></span>`).join('') })}
+    <div class="beweiskarte">
       <span class="beweiskarte__bild">${art.merkmal(step.feld, step.label, step.icon)}</span>
-      <b>${esc(step.label)}</b>
-      <small>Vom Tatort</small>
-      <span class="beweisFrage"><button class="sage__hoer" aria-label="Nochmal vorlesen">${hoerIcon}</button>
-        <span>${esc(step.frage)}</span></span>
-    </div>`, 'scr--lineup');
+      <span class="beweiskarte__ring"></span>
+    </div>
+    ${stillText(step.frage, `${F.id}-lin${E.lineupIdx}-f`, true)}`, 'scr--lineup');
 
   sfx.whoosh();
   sprich(`${F.id}-lin${E.lineupIdx}-f`);
@@ -759,8 +857,8 @@ function scrVerhaftung() {
       <div class="reihe">${F.verdaechtige.map(v => personHtml(v, false)).join('')}</div>
     </div>
     <div class="blaulicht" id="blaulicht"></div>
-    ${kopf('Wer war es?', 'Tippe die Person an', { notiz: true, schritte: schrittPips() })}
-    ${sageBox('Wer bleibt übrig? Tippe die Person an.', 'g-verhaften')}`, 'scr--verhaftung');
+    ${bedien({ notiz: true, sage: 'g-verhaften', pips: schrittPips() })}
+    ${stillText('Wer bleibt übrig? Tippe die Person an.', 'g-verhaften')}`, 'scr--verhaftung');
 
   Promise.all([sprich('g-verhaften'), warte(3200)])
     .then(() => { const b = $('.sage', s); if (b) b.classList.add('sage--weg'); });
