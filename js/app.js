@@ -5,7 +5,7 @@ import { FAELLE, RANG_TEXTE } from './cases.js';
 import * as art from './art.js';
 import * as S from './state.js';
 import { sfx, unlock, setSound, soundOn, setMusik, musikLaeuft, kulisse } from './audio.js';
-import { sprich, stopp, setSprache, spracheAn, sprichFolge, vorladen, beiWechsel, laeuft } from './voice.js';
+import { sprich, stopp, stoppBildwechsel, setSprache, spracheAn, sprichFolge, vorladen, beiWechsel, laeuft } from './voice.js';
 
 const buehne = document.getElementById('buehne');
 const B = { w: 1000, h: 480 };
@@ -34,7 +34,9 @@ addEventListener('orientationchange', () => setTimeout(passen, 120));
 
 function zeige(html, klasse = '') {
   if (aufraeumen) { aufraeumen(); aufraeumen = null; }
-  stopp();
+  // Nicht stopp(): eine laufende Rueckmeldung («Genau richtig») gehoert zu
+  // dem, was das Kind getan hat, und soll den Wechsel ueberleben.
+  stoppBildwechsel();
   const alt = buehne.firstElementChild;
   if (alt) { alt.classList.add('scr--raus'); setTimeout(() => alt.remove(), 220); }
   const neu = document.createElement('div');
@@ -97,7 +99,7 @@ function sageVerbinden(wurzel) {
   if (!box || !box.dataset.sage) return;
   const hoer = $('.sage__hoer', box);
   // Die Kennung wird erst beim Klick gelesen: der Kasten wechselt seinen Text.
-  (hoer || box).addEventListener('click', () => { unlock(); sprich(box.dataset.sage); });
+  (hoer || box).addEventListener('click', () => { unlock(); sprich(box.dataset.sage, { sofort: true }); });
   const ab = beiWechsel((l) => hoer && hoer.classList.toggle('laut', l === box.dataset.sage));
   const alt = aufraeumen;
   aufraeumen = () => { ab(); alt && alt(); };
@@ -117,7 +119,9 @@ function fehler(text, stimme = 'g-falsch') {
   E.fehler++;
   sfx.wrong();
   meldung(text, 'schlecht');
-  sprich(stimme);
+  // Sofort: eine Rueckmeldung auf einen falschen Tipp muss beim Tipp
+  // ankommen, sonst bezieht das Kind sie nicht mehr darauf.
+  sprich(stimme, { sofort: true });
   if (navigator.vibrate) navigator.vibrate(50);
 }
 
@@ -384,6 +388,8 @@ function scrTatort() {
 
   const stups = setInterval(() => {
     if (Date.now() - letzte < 15000) return;
+    // Nicht hineinbellen, wenn gerade gesprochen wird – das Kind hoert zu.
+    if (laeuft()) return;
     letzte = Date.now();
     const offen = F.spuren.filter(x => !E.gefunden.includes(x.id));
     if (offen.length) hinweis(offen[0]);
