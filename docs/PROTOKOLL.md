@@ -391,3 +391,58 @@ lief deshalb zunächst in einen Timeout – er klickte mit fester Wartezeit in
 eine noch laufende Lineup-Runde hinein. `tools/test.js` wartet jetzt auf den
 Rundenzähler statt auf die Uhr. Ob das Spiel dadurch zäher wirkt, entscheidet
 kein Messwert, sondern das Kind.
+
+## Runde 7 – Merkmalstafeln statt Wortchips
+
+**Auftrag.** «Beim Spurenabgleich im Labor sind die Symbole bei den Personen
+immer noch klein und mit Text. Über den Personen hat es viel Platz. Nutze den
+für grössere, eindeutige und ohne Text verständliche Symbole.»
+
+### Was falsch war
+
+Unter jedem Verdächtigen stand ein 15-Pixel-Feldsymbol mit dem Wert als Wort
+daneben: ein winziger Fingerabdruck und «Wirbel», ein Schlüsselchen und «ja».
+Zwei Fehler auf einmal:
+
+1. **Zu klein, am falschen Ort.** Über den Köpfen lagen rund 340 Pixel leere
+   Wand, unter der Reihe war kein Platz – die Chips brachen um, und weil sie
+   bei jeder Person anders umbrachen, stand «Herr Ammann» auch noch höher als
+   die anderen.
+2. **Das Symbol sagte nur, worum es geht.** *Was* der Wert ist, stand als
+   Wort daneben. Ein Achtjähriger vergleicht dann Wörter statt Bilder – genau
+   das, was der Spurenabgleich eigentlich üben soll.
+
+### Was jetzt da steht
+
+`art.merkmal(feld, wert)` zeichnet jeden **Wert** als eigenes Bild, auf 64 × 64
+mit kräftigen Formen: Sohlenprofile im Sohlenumriss, Fingerabdruckmuster,
+Fahrzeugsilhouetten, Farbkleckse in der echten Farbe, Wollfasern, Schlüssel,
+Guetzli, Dorf / Wald / Zug. Die Tafeln stehen über dem Kopf, 54 px bei drei
+Merkmalen, 78 px bei zweien. Die Beweiskarte links zeigt **dasselbe Bild** –
+sonst vergleicht das Kind zwei Zeichensprachen.
+
+«Gibt es nicht» ist die Sache selbst, ausgegraut und rot durchgestrichen. Ein
+leeres Feld wäre mehrdeutig: es könnte auch «noch nicht geprüft» heissen.
+
+### Zwei Entwürfe, die durchgefallen sind
+
+* **Mountainbike und Rennvelo waren beide «ein Velo».** Der Unterschied lag im
+  Detail, und Detail trägt bei 54 Pixeln nicht. Jetzt trägt ihn die Silhouette:
+  dicke Stollenreifen und gerader Lenker gegen hauchdünne Reifen und Rennbügel.
+* **Der Schuhgrössen-Umriss las sich als Totenkopf.** Ein hochkantes Oval mit
+  zwei Ziffern darin – im Screenshot sofort zu sehen, am Bildschirm nicht
+  gedacht. Ersetzt durch einen Schuh in Seitenansicht.
+
+Beides fiel nur auf, weil ich die Bildschirme abfotografiert und angeschaut
+habe, statt den Code für richtig zu halten.
+
+### Was ich **nicht** wegzeichnen konnte
+
+**Schuhgrössen.** 36, 38 und 40 unterscheiden sich um wenige Prozent; als
+Umriss gezeichnet wäre das Raten statt Vergleichen. Die Zahl bleibt eine Zahl,
+gross in den Schuh gestempelt. Für Achtjährige ist eine zweistellige Zahl
+keine Leseaufgabe – aber es ist die eine Stelle, an der die Vorgabe «ohne
+Text» nicht eingehalten ist, und das soll nicht untergehen.
+
+Nebenbei behoben: der RAUS-Stempel klebte nach dem Umbau auf den Tafeln statt
+auf dem Gesicht, und lange Namen brachen um und verschoben die ganze Karte.
