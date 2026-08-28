@@ -3,21 +3,35 @@
    Alle Masse sind Bühnen-Pixel, damit die Komposition auf jedem Gerät stimmt. */
 
 :root {
-  --holz-1: #2f2117; --holz-2: #16100a; --holz-3: #3d2b1d;
-  --papier: #f5efe1; --papier-2: #e9e0cc; --papier-3: #d9cdb2; --kante: #c9bb9d;
-  --ink: #23272f; --ink-2: #5b6270; --ink-3: #8b8f9a;
-  --blau: #1f4f86; --rot: #b0341d; --messing: #d09a30; --messing-d: #96690f;
-  --gut: #2e7d4f; --nacht: #0c141f;
+  /* EDURINO-Palette: Himmelblau als Leitfarbe, cremeweisse Flaechen, kraeftige
+     Akzente, viel Weissraum. Vorher war alles dunkles Holz und Papier – das
+     trug das Detektivthema, wirkte auf dem Tablet aber schwer.
+     Die Illustrationen bleiben unveraendert; nur die Huelle wechselt. */
+  --himmel:   #4ec2ea;   /* Leitfarbe */
+  --himmel-h: #b6e6f8;   /* helle Flaeche */
+  --himmel-hh:#e2f5fd;   /* fast weiss */
+  --himmel-d: #1d84b8;   /* Kontrast, Text auf hell */
+  --tief:     #12405f;   /* dunkle Flaeche, wo es eine braucht */
+
+  --papier: #fdf8ee; --papier-2: #f4ebda; --papier-3: #e6dbc5; --kante: #cdbfa4;
+  --ink: #14323f; --ink-2: #4d6b7b; --ink-3: #8aa4b1;
+  --blau: #1d84b8; --rot: #e2593c; --messing: #f7a72c; --messing-d: #c87d0e;
+  --gut: #35a86a; --nacht: #0c141f;
+
+  --rund: 20px;          /* ein Radius fuer fast alles */
   --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI",
           Roboto, "Helvetica Neue", Arial, sans-serif;
-  --schatten: 0 2px 4px rgba(15,8,3,.35), 0 12px 30px rgba(15,8,3,.45);
+  /* Weiche, blaustichige Schatten statt harter schwarzer – schwarze Schatten
+     auf hellem Grund sehen schmutzig aus. */
+  --schatten: 0 3px 6px rgba(18,64,95,.14), 0 14px 34px rgba(18,64,95,.22);
+  --schatten-k: 0 2px 5px rgba(18,64,95,.16);
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body {
   margin: 0; padding: 0; width: 100%; height: 100%;
   overflow: hidden; position: fixed; inset: 0;
-  background: var(--holz-2); color: var(--ink);
+  background: var(--himmel); color: var(--ink);
   font-family: var(--font); touch-action: manipulation;
   overscroll-behavior: none; user-select: none; -webkit-user-select: none;
 }
@@ -28,10 +42,8 @@ button { font: inherit; color: inherit; border: none; background: none; cursor: 
 body::before {
   content: ""; position: fixed; inset: -10%; z-index: 0;
   background:
-    radial-gradient(70% 55% at 50% 0%, rgba(255,196,110,.18), transparent 65%),
-    repeating-linear-gradient(96deg, rgba(255,255,255,.02) 0 2px, transparent 2px 8px,
-      rgba(0,0,0,.03) 8px 10px, transparent 10px 18px),
-    linear-gradient(165deg, var(--holz-3), var(--holz-1) 45%, var(--holz-2));
+    radial-gradient(80% 60% at 50% 0%, #d9f2fc, transparent 70%),
+    linear-gradient(180deg, #8ad7f2, var(--himmel) 52%, #2fa9d8);
 }
 
 /* ---------------- Bühne ---------------- */
@@ -55,7 +67,7 @@ body::before {
 #quer {
   position: fixed; inset: 0; z-index: 200; display: none;
   place-items: center; text-align: center;
-  background: linear-gradient(165deg, var(--holz-3), var(--holz-2));
+  background: linear-gradient(180deg, var(--himmel-hh), var(--himmel-h));
   color: var(--papier); font-family: var(--font);
 }
 body.hochkant #quer { display: grid; }
@@ -90,23 +102,26 @@ body.hochkant #app { visibility: hidden; }
   background-size: 7px 7px;
 }
 
+/* Pillenform, kraeftiges Orange, weisse Schrift – der eine Knopf, der
+   «weiter» heisst, soll sich von allem anderen unterscheiden. */
 .btn {
-  min-height: 52px; padding: 0 26px; border-radius: 12px;
-  background: linear-gradient(180deg, #e8bf5f, var(--messing) 55%, var(--messing-d));
-  color: #3a2708; font-weight: 800; font-size: 21px;
-  box-shadow: 0 4px 0 #6f4a0b, 0 8px 18px rgba(15,8,3,.4),
-              0 1px 0 rgba(255,255,255,.5) inset;
+  min-height: 56px; padding: 0 30px; border-radius: 999px;
+  background: linear-gradient(180deg, #ffbc4f, var(--messing) 60%, #e8931b);
+  color: #fff; font-weight: 800; font-size: 21px;
+  border: 3px solid #fff;
+  box-shadow: 0 5px 0 #c87d0e, 0 10px 22px rgba(18,64,95,.3);
   transition: transform .07s, box-shadow .07s;
   display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  text-shadow: 0 1px 2px rgba(0,0,0,.18);
 }
-.btn:active { transform: translateY(4px); box-shadow: 0 0 0 #6f4a0b; }
+.btn:active { transform: translateY(5px); box-shadow: 0 0 0 #c87d0e; }
 .btn--gross { min-height: 62px; font-size: 25px; padding: 0 36px; }
-.btn--klein { min-height: 42px; padding: 0 15px; font-size: 16px;
-  box-shadow: 0 2px 0 rgba(0,0,0,.25), 0 1px 0 rgba(255,255,255,.6) inset; }
+.btn--klein { min-height: 46px; padding: 0 20px; font-size: 16px;
+  box-shadow: 0 3px 0 rgba(18,64,95,.2); }
 .btn--geist {
-  background: rgba(245,239,225,.9); color: var(--ink);
-  box-shadow: 0 3px 0 rgba(0,0,0,.25), 0 1px 0 rgba(255,255,255,.6) inset;
-  font-weight: 700;
+  background: #fff; color: var(--himmel-d);
+  box-shadow: 0 3px 0 rgba(18,64,95,.18);
+  font-weight: 800; text-shadow: none;
 }
 .btn[disabled] { opacity: .4; pointer-events: none; }
 
@@ -124,7 +139,7 @@ body.hochkant #app { visibility: hidden; }
 .knopf--notiz   { right: 18px; top: 16px; }
 .knopf--hoer    { right: 18px; bottom: 18px; background: rgba(245,239,225,.95); }
 /* Wenn ein Weiter-Knopf da ist, rueckt der Hoer-Knopf nach links daneben. */
-.scr:has(.weiterBtn) .knopf--hoer { right: 176px; }
+.scr:has(.weiterBtn) .knopf--hoer { right: 190px; }
 .fortschritt {
   position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%);
   display: flex; gap: 7px; z-index: 28;
@@ -156,12 +171,14 @@ body.hochkant #app { visibility: hidden; }
 }
 .kopf > * { pointer-events: auto; }
 .kopf__titel {
-  font-size: 20px; font-weight: 800; color: var(--papier);
-  text-shadow: 0 2px 6px rgba(0,0,0,.75); flex: 1;
+  /* Dunkel auf hell: die weisse Schrift stammt aus der Zeit der dunklen
+     Holzleiste. Sie steht nur noch auf Menue- und Erzaehlbildschirmen. */
+  font-size: 22px; font-weight: 800; color: var(--ink);
+  text-shadow: none; flex: 1;
 }
 .kopf__titel small {
   display: block; font-size: 13px; font-weight: 700; letter-spacing: .07em;
-  text-transform: uppercase; color: #d8c9ab; text-shadow: 0 1px 4px rgba(0,0,0,.8);
+  text-transform: uppercase; color: var(--himmel-d); text-shadow: none;
 }
 .kopf--dunkel .kopf__titel { color: var(--ink); text-shadow: none; }
 .kopf--dunkel .kopf__titel small { color: var(--ink-2); text-shadow: none; }
@@ -175,10 +192,10 @@ body.hochkant #app { visibility: hidden; }
 .sage {
   position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
   max-width: 640px; display: flex; align-items: center; gap: 12px;
-  background: rgba(14,20,28,.86); color: #f6efe0;
-  border: 1px solid rgba(255,255,255,.16); border-radius: 14px;
+  background: #fff; color: var(--ink);
+  border: 3px solid #fff; border-radius: 22px;
   padding: 12px 18px; font-size: 20px; z-index: 25; pointer-events: none;
-  box-shadow: 0 8px 26px rgba(0,0,0,.5);
+  box-shadow: var(--schatten);
   animation: sageRein .3s cubic-bezier(.2,1.3,.4,1) both;
 }
 @keyframes sageRein { from { opacity: 0; transform: translateX(-50%) translateY(16px) } }
@@ -245,6 +262,7 @@ body.hochkant #app { visibility: hidden; }
 .akten { position: absolute; left: 0; right: 0; top: 70px; bottom: 16px;
   display: flex; gap: 16px; justify-content: center; align-items: center; }
 .akte {
+  border-radius: var(--rund); overflow: hidden;
   width: 182px; height: 372px; border-radius: 8px; overflow: hidden;
   background: var(--papier); box-shadow: var(--schatten); position: relative;
   display: flex; flex-direction: column;
@@ -253,18 +271,18 @@ body.hochkant #app { visibility: hidden; }
 }
 @keyframes akteRein { from { opacity: 0; transform: translateY(40px) rotate(-3deg) } }
 .akte:active { transform: translateY(-4px) scale(1.03); }
-.akte__bild { height: 224px; background: var(--nacht); position: relative; overflow: hidden; }
+.akte__bild { height: 224px; background: var(--himmel-h); position: relative; overflow: hidden; }
 .akte__bild img { width: 100%; height: 100%; object-fit: cover; }
 .akte__nr {
-  position: absolute; left: 10px; top: 10px; width: 38px; height: 38px;
-  border-radius: 8px; background: var(--rot); color: #fff3ee;
+  position: absolute; left: 10px; top: 10px; width: 42px; height: 42px;
+  border-radius: 14px; background: var(--rot); color: #fff3ee;
   display: grid; place-items: center; font-weight: 900; font-size: 21px;
   box-shadow: 0 3px 8px rgba(0,0,0,.45);
 }
 .akte__txt { padding: 10px 12px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
 .akte__txt b { font-size: 18px; line-height: 1.15; }
 .akte__txt small { color: var(--ink-2); font-size: 13px; }
-.akte--zu { filter: grayscale(.9) brightness(.72); }
+.akte--zu { filter: grayscale(.85) brightness(.94); opacity: .75; }
 .akte--zu .akte__nr { background: var(--ink-3); }
 .sterne { letter-spacing: 2px; font-size: 19px; color: var(--messing-d); margin-top: auto; }
 .sterne--leer { color: var(--papier-3); }
@@ -390,13 +408,13 @@ body.hochkant #app { visibility: hidden; }
 .beweisleiste {
   position: absolute; right: 14px; top: 80px;
   display: flex; flex-direction: column; gap: 8px; z-index: 20;
-  background: rgba(14,20,28,.7); border-radius: 14px; padding: 10px;
-  backdrop-filter: blur(6px); pointer-events: none;
+  background: rgba(255,255,255,.9); border-radius: 20px; padding: 10px;
+  box-shadow: var(--schatten-k); pointer-events: none;
   animation: sageRein .3s ease both;
 }
 .bslot {
-  width: 50px; height: 50px; border-radius: 9px; display: grid; place-items: center;
-  background: rgba(255,255,255,.09); border: 2px dashed rgba(255,255,255,.24);
+  width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center;
+  background: var(--himmel-hh); border: 2px dashed rgba(29,132,184,.45);
 }
 .bslot svg { width: 27px; height: 27px; }
 .bslot--voll {
@@ -412,14 +430,18 @@ body.hochkant #app { visibility: hidden; }
 @keyframes weiterRein { from { opacity: 0; transform: translateY(18px) scale(.9) } }
 
 /* ---------------- Labor ---------------- */
+/* Labor und Zeitstrahl hatten als einzige Bildschirme gar keine Szene – nur
+   Flaeche. Bei EDURINO liegt jede Aufgabe in einer Welt; jetzt hier auch. */
+.scr--labor { background: url("../assets/img/labor.webp") center/cover no-repeat; }
+.scr--zeit  { background: url("../assets/img/buero.webp") center/cover no-repeat; }
 
 /* Ohne Kopfleiste beginnt der Inhalt 40 Pixel weiter oben und darf hoeher
    werden – die Probe war vorher unnoetig klein. */
 .laborProbe {
   position: absolute; left: 30px; top: 26px; width: 258px; height: 372px;
   display: grid; place-items: center;
-  padding: 14px; border: 3px dashed var(--kante);
-  border-radius: 16px; background: rgba(233,224,204,.7);
+  padding: 14px; border: 4px dashed rgba(29,132,184,.4);
+  border-radius: var(--rund); background: rgba(255,255,255,.82);
 }
 /* Derselbe goldene Ring wie bei der Beweiskarte und der gesuchten Spur:
    auf allen Bildschirmen heisst Gold «das hier suchst du». */
@@ -436,13 +458,15 @@ body.hochkant #app { visibility: hidden; }
 .karten--3 { grid-template-columns: repeat(3, 1fr); }
 .karten--zahl { grid-template-columns: repeat(3, 1fr); align-content: center; height: auto; top: 150px; }
 .karte {
-  background: #fffdf6; border: 3px solid var(--kante); border-radius: 8px;
+  background: #fff; border: 4px solid #fff; border-radius: var(--rund);
   padding: 10px; display: flex; flex-direction: column; align-items: center;
-  justify-content: center; gap: 8px; box-shadow: 0 5px 14px rgba(15,8,3,.3);
+  justify-content: center; gap: 8px; box-shadow: var(--schatten);
+  transition: transform .14s ease, box-shadow .14s ease;
   animation: karteRein .5s cubic-bezier(.2,1.2,.4,1) both;
 }
+.karte:active { transform: translateY(3px) scale(.98); }
 @keyframes karteRein { from { opacity: 0; transform: rotateY(70deg) translateY(20px) } }
-.karte svg { max-height: 210px; width: auto; max-width: 100%; }
+.karte svg { max-height: 268px; width: auto; max-width: 100%; }
 .karte span { font-size: 15px; font-weight: 800; letter-spacing: .07em;
   text-transform: uppercase; color: var(--ink-2); }
 .karte--zahl { font-size: 30px; font-weight: 900; min-height: 92px; }
@@ -458,7 +482,7 @@ body.hochkant #app { visibility: hidden; }
    faehrt in den gewaehlten Ast. Keine Kopfleiste, kein Textkasten: der
    Bildschirm gehoert der Szene, gesprochen wird ohnehin. */
 
-.scr--vf { background: #1b1f26; }
+.scr--vf { background: var(--himmel-h); }
 .vf { position: absolute; inset: 0; overflow: hidden; }
 
 .vfKamera {
@@ -543,9 +567,9 @@ body.hochkant #app { visibility: hidden; }
 .zsBox { position: absolute; left: 40px; right: 40px; top: 66px; height: 332px; }
 .zsSkala { position: relative; height: 30px; margin-left: 150px; }
 .zsSkala span { position: absolute; top: 0; transform: translateX(-50%);
-  font-size: 15px; font-weight: 800; color: #d8c9ab; text-shadow: 0 1px 4px rgba(0,0,0,.8); }
-.zsSkala i { position: absolute; top: 20px; width: 1px; height: 262px;
-  background: rgba(0,0,0,.1); }
+  font-size: 15px; font-weight: 800; color: var(--himmel-d); }
+.zsSkala i { position: absolute; top: 20px; width: 2px; height: 294px;
+  background: rgba(29,132,184,.16); border-radius: 2px; }
 .zsFenster {
   position: absolute; top: 20px; height: 262px; border-radius: 6px;
   background: rgba(176,52,29,.14); border: 2px dashed rgba(176,52,29,.55); z-index: 1;
@@ -554,9 +578,12 @@ body.hochkant #app { visibility: hidden; }
   background: var(--rot); color: #fff; font-size: 13px; padding: 2px 10px;
   border-radius: 0 0 7px 7px; letter-spacing: .06em; }
 .zsReihe { position: relative; height: 56px; margin-top: 6px; display: flex; align-items: center; }
-.zsName { width: 150px; display: flex; align-items: center; gap: 8px; font-size: 17px;
-  font-weight: 800; color: var(--papier); text-shadow: 0 2px 6px rgba(0,0,0,.8); }
-.zsName .portraet { flex-basis: 42px; width: 42px; height: 42px; border-radius: 8px; }
+/* Auf hellem Grund dunkel schreiben – die weisse Schrift stammt aus der
+   Zeit, als hinter dem Zeitstrahl dunkles Holz lag. */
+.zsName { width: 150px; display: flex; align-items: center; gap: 9px; font-size: 17px;
+  font-weight: 800; color: var(--ink); }
+.zsName .portraet { flex-basis: 46px; width: 46px; height: 46px; border-radius: 14px;
+  border: 3px solid #fff; box-shadow: var(--schatten-k); }
 .zsBahn { position: relative; flex: 1; height: 100%; }
 .zsBalken {
   position: absolute; top: 12px; height: 32px; border-radius: 8px; z-index: 2;
@@ -574,42 +601,48 @@ body.hochkant #app { visibility: hidden; }
 /* Ohne Kopfleiste beginnt die Wand ganz oben – sonst blieb ein brauner
    Streifen stehen, wo die Leiste war. */
 .lineup { position: absolute; inset: 0; }
+/* Heller Raum statt Betonwand. Die Messlinien bleiben – sie sagen
+   «Gegenueberstellung» –, aber in Blau statt in Grau. */
 .wand {
   position: absolute; inset: 0;
   background:
-    repeating-linear-gradient(180deg, transparent 0 37px, rgba(0,0,0,.09) 37px 39px),
-    linear-gradient(180deg, #7d8894, #5d6874 62%, #4a535d);
+    repeating-linear-gradient(180deg, transparent 0 37px, rgba(29,132,184,.10) 37px 39px),
+    linear-gradient(180deg, var(--himmel-hh), var(--himmel-h) 62%, #96d9f2);
 }
 .wand::after {
-  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 62px;
-  background: linear-gradient(180deg, #3d444d, #2b3138);
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 76px;
+  background: linear-gradient(180deg, #f0e2c6, #e0cda6);
+  box-shadow: 0 -2px 0 rgba(18,64,95,.12);
 }
 .reihe {
-  position: absolute; left: 0; right: 0; bottom: 20px;
+  position: absolute; left: 0; right: 0; bottom: 34px;
   display: flex; justify-content: center; align-items: flex-end; gap: 18px;
 }
 /* Mit Beweiskarte links braucht die Reihe dort Luft. */
 .scr--lineup .reihe { left: 146px; right: 14px; justify-content: space-evenly; gap: 6px; }
 /* Ohne Merkmalschips sind die Karten flacher – die Reihe rueckt in die Mitte. */
-.scr--verhaftung .reihe { bottom: 74px; }
+.scr--verhaftung .reihe { bottom: 60px; }
+/* Groesser und weiter oben: mit heller Wand fiel auf, wie viel Luft ueber
+   den Koepfen leer stand. */
 .person {
-  width: 176px; display: flex; flex-direction: column; align-items: center; gap: 8px;
+  width: 190px; display: flex; flex-direction: column; align-items: center; gap: 9px;
   position: relative; transition: transform .35s ease, filter .35s ease;
   animation: personRein .5s cubic-bezier(.2,1.2,.4,1) both;
 }
 @keyframes personRein { from { opacity: 0; transform: translateY(30px) } }
 .person__bild {
-  width: 128px; height: 128px; border-radius: 10px; overflow: hidden;
-  background: var(--papier-3); border: 4px solid #fffdf6;
-  box-shadow: 0 8px 20px rgba(0,0,0,.5);
+  width: 168px; height: 168px; border-radius: 22px; overflow: hidden;
+  background: var(--papier-3); border: 5px solid #fff;
+  box-shadow: var(--schatten);
 }
 .person__bild img { width: 100%; height: 100%; object-fit: cover; }
 /* Einzeilig, komme was wolle: bricht ein Name um, wird die ganze Karte
    höher und die Tafeln dieser Person rutschen aus der Reihe. Genau das
    passierte «Herr Ammann». */
 .person__name {
-  background: rgba(245,239,225,.95); border-radius: 7px; padding: 3px 11px;
-  font-weight: 800; font-size: 16px; white-space: nowrap;
+  background: #fff; border-radius: 999px; padding: 5px 16px;
+  font-weight: 800; font-size: 17px; white-space: nowrap;
+  box-shadow: var(--schatten-k);
 }
 
 /* Merkmalstafeln über dem Kopf.
@@ -619,14 +652,14 @@ body.hochkant #app { visibility: hidden; }
    der Zahl der Merkmale — bei zweien darf jede Tafel breiter werden. */
 .person__marken { display: flex; gap: 6px; justify-content: center; }
 .person__marken[data-n="1"] .marke { width: 92px; }
-.person__marken[data-n="2"] .marke { width: 78px; }
-.person__marken[data-n="3"] .marke { width: 54px; }
+.person__marken[data-n="2"] .marke { width: 84px; }
+.person__marken[data-n="3"] .marke { width: 58px; }
 .person__marken[data-n="4"] .marke { width: 40px; }
 .marke {
-  width: 50px; aspect-ratio: 1; border-radius: 12px; overflow: hidden;
-  background: rgba(245,239,225,.94);
-  border: 3px solid rgba(255,253,246,.9);
-  box-shadow: 0 5px 14px rgba(0,0,0,.4);
+  width: 50px; aspect-ratio: 1; border-radius: 16px; overflow: hidden;
+  background: #fff;
+  border: 3px solid #fff;
+  box-shadow: var(--schatten-k);
   display: block; transition: transform .25s ease, border-color .25s ease,
     box-shadow .25s ease;
 }
@@ -651,7 +684,7 @@ body.hochkant #app { visibility: hidden; }
    Kopf stehen, faengt das Portraet erst rund 70 Pixel tiefer an – ohne diese
    Zeile klebte der Stempel auf den Tafeln. In der Verhaftung gibt es keine
    Tafeln, dort gilt weiterhin der Grundwert. */
-.scr--lineup .person--raus::after { top: 128px; }
+.scr--lineup .person--raus::after { top: 150px; }
 .person--falsch { animation: wackeln .4s; }
 .person--taeter .person__bild { border-color: var(--rot); box-shadow: 0 0 0 6px rgba(176,52,29,.45); }
 
