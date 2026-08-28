@@ -605,3 +605,52 @@ aufgefallen.
 
 Alle fünf Fälle 3/3 Sterne, keine JS-Fehler, Ton und Sprachreihenfolge
 unverändert sauber. Zwei neue Bilddateien, zusammen 94 KB.
+
+## Runde 10 – EDURINO-Look
+
+**Auftrag.** «Gespielt – die Symbole sind besser, die Audio entspannender.
+Nun bitte EDORINO-Style.»
+
+Damit ist der Einwand aus Runde 9 überstimmt, und zwar zu Recht: ich hatte
+[Wahrscheinlich] vermutet, ein Achtjähriger empfinde die helle,
+kindergartennahe Farbwelt als Herabstufung. Der Vater hat das Spiel mit dem
+Kind gespielt; das schlägt meine Vermutung.
+
+### Was gewechselt hat
+
+Die **Hülle**, nicht die Illustrationen. Die bleiben unverändert – sie tragen
+das Thema.
+
+| | vorher | jetzt |
+|---|---|---|
+| Grundfarbe | dunkles Holz `#16100a` | Himmelblau `#4ec2ea` |
+| Flächen | Papier und Braun | Cremeweiss und Weiss |
+| Radius | 8–14 px | einheitlich 20 px, Knöpfe rund |
+| Runde Knöpfe | 46 px, papierfarben | **58 px**, weiss mit dickem Ring |
+| Hauptknopf | Messingtaste, eckig | orange Pille, weisser Rand |
+| Schatten | schwarz | blaustichig – schwarze Schatten auf hellem Grund sehen schmutzig aus |
+| Gegenüberstellung | graue Betonwand | heller Raum mit Holzboden |
+| Porträts im Lineup | 128 px | **168 px**, Radius 22 |
+
+### Zwei Bildschirme hatten gar keine Welt
+
+Labor und Zeitstrahl standen als einzige auf blosser Fläche. Bei EDURINO
+liegt jede Aufgabe in einer Welt – jetzt hier auch: eine Laborbank mit
+Mikroskop und Probengläsern, eine Bürowand mit Pinnwand. Beide erzeugt,
+zusammen 37 KB.
+
+Nebenbei gelernt: `gemini-3-pro-image` lieferte durchgehend HTTP 503.
+`gemini-3.1-flash-image` funktionierte auf Anhieb und in gleicher Qualität.
+Bei Vorschaumodellen lohnt es, ein zweites in der Hinterhand zu haben.
+
+### Was der Wechsel aufgedeckt hat
+
+Drei Stellen schrieben **hell auf dunkel** und wären auf dem neuen Grund
+unlesbar gewesen: die Namen im Zeitstrahl, der Titel in der Kopfleiste der
+Menübildschirme und deren Untertitel. Alle drei stammten aus der Zeit des
+dunklen Holzes. Das ist der übliche Preis eines Farbwechsels – und der Grund,
+warum man danach jeden Bildschirm anschaut statt nur die Variablen zu tauschen.
+
+### Ergebnis
+
+Alle fünf Fälle 3/3 Sterne, keine JS-Fehler, Ton unverändert sauber.
