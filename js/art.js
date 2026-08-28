@@ -487,3 +487,279 @@ export function szeneFallback(kind) {
   };
   return svg('0 0 1000 667', s[kind] || s.schule, 'scene__svg');
 }
+
+/* ======================== MERKMALSZEICHEN ========================
+   Bei der Gegenüberstellung stand unter jedem Verdächtigen ein winziges
+   Feldsymbol mit dem Wert daneben als Wort: ein 15-Pixel-Fingerabdruck und
+   «Wirbel», ein Schlüsselchen und «ja». Das ist zweimal falsch. Erstens war
+   es zu klein — über den Köpfen lagen 340 Pixel leere Wand. Zweitens sagte
+   das Symbol nur, *worum* es geht, und das Wort sagte, *was* der Wert ist.
+   Ein Achtjähriger vergleicht dann Wörter, nicht Bilder.
+
+   Hier bekommt jeder **Wert** sein eigenes Bild: nicht «Fingerabdruck +
+   Wirbel», sondern ein gezeichneter Wirbel. Der Vergleich mit der
+   Beweiskarte wird damit zu dem, was er sein soll — zwei Bilder nebeneinander.
+
+   Gezeichnet wird auf 64 x 64 mit kräftigen Formen: bei 54 Pixeln auf dem
+   Bildschirm trägt kein feines Detail mehr.
+
+   Eine Einschränkung, die ich nicht wegzeichnen kann: **Schuhgrössen.** 36,
+   38 und 40 unterscheiden sich um wenige Prozent — als Umriss gezeichnet wäre
+   das Raten. Die Zahl bleibt darum eine Zahl, gross in den Schuh gestempelt.
+   Ziffern sind für Achtjährige ohnehin keine Leseaufgabe.                  */
+
+const M_GRUND = '#f5efe1';
+const M_LINIE = '#2a2f3a';
+
+const mSvg = (inner, extra = '') => `<svg xmlns="${NS}" viewBox="0 0 64 64"
+  preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+  <rect width="64" height="64" rx="12" fill="${M_GRUND}"/>${inner}${extra}</svg>`;
+
+/* «Gibt es nicht»: dasselbe Bild, ausgegraut und durchgestrichen. Ein leeres
+   Feld wäre mehrdeutig — es könnte auch «noch nicht geprüft» heissen. */
+const mNein = (inner) => mSvg(
+  `<g opacity=".42" style="filter:grayscale(1)">${inner}</g>
+   <path d="M13 51 L51 13" stroke="${ROT}" stroke-width="6"
+     stroke-linecap="round" opacity=".92"/>`);
+
+/* --- Sohlenprofile: nur das Muster, in einem Sohlenumriss --- */
+function mSohle(muster) {
+  const umriss = 'M32 6c11 0 16 8 16 17 0 6-2 10-3 14-2 5-2 9-2 13 0 5-4 8-11 8s-11-3-11-8c0-4 0-8-2-13-1-4-3-8-3-14 0-9 5-17 16-17z';
+  let p = '';
+  if (muster === 'zickzack') {
+    for (let y = 10; y < 58; y += 7) {
+      const pts = [];
+      for (let x = 12; x <= 52; x += 5) pts.push([x, y + ((x / 5) % 2 < 1 ? 0 : 4)]);
+      p += `<path d="${pfad(pts)}" fill="none" stroke="${M_LINIE}" stroke-width="3.2" stroke-linejoin="round"/>`;
+    }
+  } else if (muster === 'punkte') {
+    for (let y = 10; y < 58; y += 7.5)
+      for (let x = 14; x < 52; x += 7.5)
+        p += `<circle cx="${x + (Math.round(y / 7.5) % 2 ? 3.7 : 0)}" cy="${y}" r="2.6"/>`;
+  } else if (muster === 'wellen') {
+    for (let y = 10; y < 58; y += 7) {
+      const pts = [];
+      for (let x = 12; x <= 52; x += 2.5) pts.push([x, y + Math.sin((x - 12) / 5) * 2.6]);
+      p += `<path d="${pfad(pts)}" fill="none" stroke="${M_LINIE}" stroke-width="3" stroke-linecap="round"/>`;
+    }
+  } else if (muster === 'raster') {
+    for (let y = 10; y < 58; y += 8) p += `<rect x="10" y="${y}" width="44" height="3.4" rx="1.6"/>`;
+    for (let x = 13; x <= 51; x += 8) p += `<rect x="${x}" y="6" width="3.4" height="52" rx="1.6"/>`;
+  } else { /* stollen */
+    for (let y = 10; y < 58; y += 11)
+      for (let x = 16; x < 50; x += 12)
+        p += `<rect x="${x + (Math.round(y / 11) % 2 ? 6 : 0) - 5}" y="${y - 4}" width="10" height="8" rx="2.5"/>`;
+  }
+  return mSvg(`
+    <clipPath id="ms${muster}"><path d="${umriss}"/></clipPath>
+    <path d="${umriss}" fill="#cfc3a8"/>
+    <g clip-path="url(#ms${muster})" fill="${M_LINIE}" opacity=".9">${p}</g>
+    <path d="${umriss}" fill="none" stroke="${M_LINIE}" stroke-width="2.4" opacity=".7"/>`);
+}
+
+/* --- Fingerabdrücke: gross genug, dass Bogen und Wirbel auseinandergehen --- */
+function mAbdruck(typ) {
+  let p = '';
+  if (typ === 'bogen') {
+    for (let i = 0; i < 7; i++) {
+      const r = 6 + i * 3.6;
+      p += `<path d="M${32 - r} 46 C${32 - r} ${40 - r} ${32 + r} ${40 - r} ${32 + r} 46"/>`;
+    }
+  } else if (typ === 'schleife') {
+    for (let i = 0; i < 7; i++) {
+      const r = 5 + i * 3.4;
+      p += `<path d="M${32 - r} 48 C${32 - r} ${34 - r * .9} ${32 + r * .5} ${30 - r} ${32 + r * .8} ${38 - r * .3}"/>`;
+    }
+  } else { /* wirbel */
+    const pts = [];
+    for (let t = 0; t < 6.4 * Math.PI; t += 0.12) {
+      const r = 2.6 + t * 1.35;
+      pts.push([32 + Math.cos(t) * r, 32 + Math.sin(t) * r]);
+    }
+    p = `<path d="${pfad(pts)}"/>`;
+  }
+  return mSvg(`
+    <clipPath id="ma${typ}"><ellipse cx="32" cy="32" rx="21" ry="25"/></clipPath>
+    <ellipse cx="32" cy="32" rx="21" ry="25" fill="#e6dcc6"/>
+    <g clip-path="url(#ma${typ})" fill="none" stroke="${M_LINIE}"
+       stroke-width="2.6" stroke-linecap="round">${p}</g>
+    <ellipse cx="32" cy="32" rx="21" ry="25" fill="none" stroke="${M_LINIE}"
+      stroke-width="2.2" opacity=".65"/>`);
+}
+
+/* --- Fahrzeuge: Silhouetten, nicht Reifenspuren. Ein Kind erkennt das
+       Trottinett am Trittbrett, nicht am Profil.
+       Der erste Entwurf war unbrauchbar: Mountainbike und Rennvelo waren
+       beide einfach «ein Velo». Der Unterschied muss die Silhouette tragen —
+       dicke Stollenreifen und gerader Lenker gegen hauchdünne Reifen und
+       Rennbügel. --- */
+function mFahrzeug(art_) {
+  if (art_ === 'rennvelo') {
+    // Hauchdünne Reifen, tiefer Rennbügel, spitzer Rahmen.
+    return mSvg(`<g fill="none" stroke="${M_LINIE}" stroke-linecap="round">
+      <circle cx="16" cy="42" r="13" stroke-width="1.8"/>
+      <circle cx="48" cy="42" r="13" stroke-width="1.8"/>
+      <g stroke-width="2.6">
+        <path d="M16 42 L27 24 L43 24 L48 42 M27 24 L34 42 M43 24 L45 15"/>
+        <path d="M24 21 h7"/>
+      </g>
+      <path d="M45 15 h6 q5 0 5 5 t-5 5" stroke-width="3.4"/></g>`);
+  }
+  if (art_ === 'mountainbike') {
+    // Dicke Stollenreifen, gerader Lenker, Federgabel.
+    let stollen = '';
+    for (const cx of [16, 48])
+      for (let t = 0; t < 12; t++) {
+        const w = t / 12 * 2 * Math.PI;
+        stollen += `<path d="M${(cx + Math.cos(w) * 10).toFixed(1)} ${(42 + Math.sin(w) * 10).toFixed(1)}
+          L${(cx + Math.cos(w) * 16).toFixed(1)} ${(42 + Math.sin(w) * 16).toFixed(1)}"/>`;
+      }
+    return mSvg(`
+      <g fill="none" stroke="${M_LINIE}" stroke-width="2.2" stroke-linecap="round"
+         opacity=".95">${stollen}</g>
+      <g fill="none" stroke="${M_LINIE}" stroke-linecap="round">
+        <circle cx="16" cy="42" r="13" stroke-width="6"/>
+        <circle cx="48" cy="42" r="13" stroke-width="6"/>
+        <g stroke-width="3.4">
+          <path d="M16 42 L27 25 L43 25 L48 42 M27 25 L33 42"/>
+          <path d="M43 25 L45 14 M41 14 h13"/>
+          <path d="M45 20 L48 33" stroke-width="4.4"/>
+        </g></g>`);
+  }
+  if (art_ === 'trottinett') {
+    // Kleine Räder, dickes Trittbrett, hoher T-Lenker.
+    return mSvg(`<g fill="none" stroke="${M_LINIE}" stroke-linecap="round">
+      <circle cx="14" cy="46" r="8" stroke-width="3.4"/>
+      <circle cx="48" cy="46" r="8" stroke-width="3.4"/>
+      <path d="M14 46 H46" stroke-width="7"/>
+      <path d="M48 46 L50 16" stroke-width="4.4"/>
+      <path d="M41 14 h16" stroke-width="5"/></g>`);
+  }
+  return mSvg(`<g fill="none" stroke="${M_LINIE}" stroke-width="3">
+    <circle cx="18" cy="44" r="10"/><circle cx="46" cy="44" r="10"/>
+    <rect x="16" y="18" width="32" height="16" rx="6"/></g>`);
+}
+
+/* --- Schuhgrösse: die Zahl bleibt, aber gross und in einem Schuh, der auch
+       wie ein Schuh aussieht. Der erste Entwurf war ein hochkantes Oval mit
+       zwei Ziffern darin — das las sich als Totenkopf. --- */
+function mGroesse(zahl) {
+  const schuh = 'M7 27 V19 Q7 12 14 11 L25 9 Q30 8 33 13 L40 25 Q52 29 55 35 Q57 39 55 41 H7 Z';
+  return mSvg(`
+    <path d="${schuh}" fill="#d9cdb2" stroke="${M_LINIE}" stroke-width="2.4"
+      stroke-linejoin="round"/>
+    <path d="M5 41 h54 q4 0 4 5 t-4 5 H5 q-4 0 -4-5 t4-5 z"
+      fill="${M_LINIE}" opacity=".85"/>
+    <text x="30" y="34" font-size="21" font-weight="900" fill="${M_LINIE}"
+      text-anchor="middle" font-family="ui-rounded, system-ui, sans-serif">${zahl}</text>`);
+}
+
+/* --- Handschrift: die Neigung ist das Merkmal, also nur Striche --- */
+function mSchrift(stil) {
+  const n = stil === 'links' ? 13 : -13;
+  let p = '';
+  for (let i = 0; i < 4; i++) {
+    const y = 18 + i * 11, l = i === 3 ? 22 : 38;
+    p += `<path d="M14 ${y + 8} l${n} -16 M${14 + l} ${y + 8} l${n} -16"/>`;
+    p += `<path d="M${16 - n / 2} ${y} h${l - 2}" stroke-width="2.4" opacity=".55"/>`;
+  }
+  return mSvg(`<g fill="none" stroke="${M_LINIE}" stroke-width="4"
+    stroke-linecap="round">${p}</g>`);
+}
+
+/* --- Farbe: der Klecks selbst. Braucht kein Wort. --- */
+const FARBTON = {
+  'moosgrün': '#5f7d34', 'tannengrün': '#12492c', 'rot': '#b0341d',
+  'blau': '#245a8d', 'braun': '#6b4526', 'blond': '#d9a441',
+  'gelb': '#dcae23', 'schwarz': '#23252b', 'weiss': '#efe9dc',
+};
+function mFarbe(name) {
+  const c = FARBTON[String(name).toLowerCase()] || '#7d7568';
+  return mSvg(`
+    <path d="M32 10c9 0 17 8 17 18 0 12-9 16-9 24 0 3-3 4-8 4s-8-1-8-4c0-8-9-12-9-24 0-10 8-18 17-18z"
+      fill="${c}" stroke="${M_LINIE}" stroke-width="2.4"/>
+    <ellipse cx="26" cy="23" rx="5" ry="7" fill="#fff" opacity=".28"
+      transform="rotate(-18 26 23)"/>`);
+}
+
+/* --- Wollfaser in ihrer Farbe --- */
+function mWolle(farbe) {
+  const c = FARBTON[String(farbe).toLowerCase()] || '#b0341d';
+  const pts = [];
+  for (let x = 8; x <= 56; x += 2) pts.push([x, 32 + Math.sin((x - 8) / 6) * 11]);
+  return mSvg(`
+    <path d="${pfad(pts)}" fill="none" stroke="${c}" stroke-width="9" stroke-linecap="round"/>
+    <path d="${pfad(pts)}" fill="none" stroke="#000" stroke-width="9"
+      stroke-linecap="round" opacity=".12"/>
+    <path d="${pfad(pts)}" fill="none" stroke="#fff" stroke-width="2.4"
+      stroke-linecap="round" opacity=".33"/>`);
+}
+
+/* --- Haarsträhne --- */
+function mHaar(farbe) {
+  const c = FARBTON[String(farbe).toLowerCase()] || '#6b4526';
+  let p = '';
+  for (let i = 0; i < 4; i++)
+    p += `<path d="M${17 + i * 10} 10 c-5 12 5 20 0 30 -3 6 0 10 3 14"
+      fill="none" stroke="${c}" stroke-width="6" stroke-linecap="round"/>`;
+  return mSvg(p);
+}
+
+/* --- Einzelne Gegenstände --- */
+const M_SCHLUESSEL = `<g fill="none" stroke="${M_LINIE}" stroke-width="4.4" stroke-linecap="round">
+  <circle cx="21" cy="28" r="10"/><path d="M29 33 L50 50"/>
+  <path d="M42 43 l-6 6 M47 47 l-5 5"/></g>`;
+const M_GUETZLI = `<circle cx="32" cy="32" r="20" fill="#cf9a4e" stroke="${M_LINIE}" stroke-width="2.6"/>
+  <g fill="#5a3a1c">
+    <circle cx="25" cy="25" r="3.4"/><circle cx="39" cy="28" r="3"/>
+    <circle cx="29" cy="39" r="3.2"/><circle cx="40" cy="40" r="2.8"/>
+    <circle cx="32" cy="18" r="2.4"/></g>`;
+const M_DORF = `<g stroke="${M_LINIE}" stroke-width="2.6" stroke-linejoin="round">
+  <path d="M8 50 V32 L20 22 L32 32 V50 Z" fill="#d8c9a8"/>
+  <path d="M32 50 V26 L44 15 L56 26 V50 Z" fill="#e7dcc2"/>
+  <rect x="15" y="38" width="9" height="12" fill="#8a6b3f"/>
+  <rect x="40" y="30" width="8" height="8" fill="#8a6b3f"/></g>`;
+const M_WALD = `<g stroke="${M_LINIE}" stroke-width="2.6" stroke-linejoin="round">
+  <path d="M18 50 L8 36 h6 L6 22 h8 L18 10 L26 22 h-6 L28 36 h-6 Z" fill="#3f6b32"/>
+  <path d="M44 52 L34 36 h6 L32 20 h9 L46 8 L54 20 h-6 L56 36 h-6 Z" fill="#4f7d3a"/>
+  <rect x="16" y="48" width="5" height="8" fill="#6b4526"/>
+  <rect x="42" y="50" width="5" height="8" fill="#6b4526"/></g>`;
+const M_ZUG = `<g stroke="${M_LINIE}" stroke-width="2.6" stroke-linejoin="round">
+  <rect x="10" y="16" width="44" height="26" rx="7" fill="#4a6b8c"/>
+  <rect x="16" y="22" width="13" height="10" rx="2.5" fill="#e7dcc2"/>
+  <rect x="35" y="22" width="13" height="10" rx="2.5" fill="#e7dcc2"/>
+  <circle cx="21" cy="47" r="5" fill="#2a2f3a"/><circle cx="43" cy="47" r="5" fill="#2a2f3a"/>
+  <path d="M6 54 h52" stroke-width="3.4"/></g>`;
+
+/* Feld -> wie der Wert gezeichnet wird. Neue Merkmale kommen hier dazu. */
+const MERKMAL = {
+  sohle:      (w) => mSohle(String(w).toLowerCase()),
+  abdruck:    (w) => mAbdruck(String(w).toLowerCase()),
+  velo:       (w) => mFahrzeug(String(w).toLowerCase()),
+  schuh:      (w) => mGroesse(w),
+  schrift:    (w) => mSchrift(String(w).toLowerCase()),
+  farbe:      (w) => mFarbe(w),
+  wolle:      (w) => (String(w).toLowerCase() === 'nein'
+                      ? mNein(`<path d="M8 32 q12 -14 24 0 t24 0" fill="none" stroke="#b0341d" stroke-width="9" stroke-linecap="round"/>`)
+                      : mWolle(w)),
+  haar:       (w) => mHaar(w),
+  schluessel: (w) => (String(w).toLowerCase() === 'nein' ? mNein(M_SCHLUESSEL) : mSvg(M_SCHLUESSEL)),
+  guetzli:    (w) => (String(w).toLowerCase() === 'nein' ? mNein(M_GUETZLI) : mSvg(M_GUETZLI)),
+  ort:        (w) => {
+    const k = String(w).toLowerCase();
+    return mSvg(k === 'wald' ? M_WALD : k === 'zug' ? M_ZUG : M_DORF);
+  },
+};
+
+/* Zeichnet den Wert eines Merkmals. Fällt auf das Feldsymbol zurück, damit
+   ein neuer Fall auch ohne eigenes Bild spielbar bleibt – dann steht der
+   Wert als Text darin, was hässlich, aber nicht kaputt ist. */
+export function merkmal(feld, wert, feldIcon) {
+  const f = MERKMAL[feld];
+  if (f) return f(wert);
+  return mSvg(`<g transform="translate(14,10) scale(1.5)" fill="none" stroke="${M_LINIE}"
+      stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      ${ICONS[feldIcon] || ICONS.zettel}</g>
+    <text x="32" y="58" font-size="13" font-weight="800" fill="${M_LINIE}"
+      text-anchor="middle" font-family="ui-rounded, system-ui, sans-serif">${wert}</text>`);
+}

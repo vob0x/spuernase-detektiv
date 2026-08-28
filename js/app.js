@@ -681,12 +681,20 @@ function scrZeugen() {
 /* ================= GEGENÜBERSTELLUNG ================= */
 
 function personHtml(v, zeigeWerte, treffer) {
+  /* Die Merkmale stehen **über** dem Porträt, nicht darunter: unter der
+     Reihe war kein Platz mehr, über ihr lagen 340 Pixel leere Wand. Und sie
+     zeigen den Wert als Bild statt als Wort — verglichen wird mit der
+     Beweiskarte, und ein Bild vergleicht sich schneller als ein Wort. Der
+     Wert bleibt im aria-label, sonst wäre der Bildschirm für Vorlesehilfen
+     leer. */
+  const marken = zeigeWerte ? Object.entries(v.werte) : [];
   return `<button class="person ${E.raus.includes(v.id) ? 'person--raus' : ''}" data-v="${v.id}">
+    ${marken.length ? `<span class="person__marken" data-n="${marken.length}">${marken.map(([k, w]) =>
+      `<span class="marke ${treffer && treffer.feld === k && String(w) === String(treffer.label) ? 'marke--treffer' : ''}"
+        title="${esc(k)}: ${esc(w)}" aria-label="${esc(k)}: ${esc(w)}">
+        ${art.merkmal(k, w, F.merkmalIcons[k])}</span>`).join('')}</span>` : ''}
     <span class="person__bild"><img src="assets/portraits/${v.bild}.webp" alt=""></span>
     <span class="person__name">${esc(v.name)}</span>
-    ${zeigeWerte ? `<span class="person__werte">${Object.entries(v.werte).map(([k, w]) =>
-      `<span class="wert ${treffer && treffer.feld === k && String(w) === String(treffer.label) ? 'wert--treffer' : ''}">
-        ${art.icon(F.merkmalIcons[k] || 'zettel', 'currentColor', 15)}${esc(w)}</span>`).join('')}</span>` : ''}
   </button>`;
 }
 
@@ -702,7 +710,7 @@ function scrLineup() {
     ${kopf('Gegenüberstellung', `Beweis ${E.lineupIdx + 1} von ${F.lineup.length}`,
            { notiz: true, schritte: schrittPips() })}
     <div class="beweiskarte" data-sage="${F.id}-lin${E.lineupIdx}-f">
-      ${art.icon(step.icon, '#96690f', 44)}
+      <span class="beweiskarte__bild">${art.merkmal(step.feld, step.label, step.icon)}</span>
       <b>${esc(step.label)}</b>
       <small>Vom Tatort</small>
       <span class="beweisFrage"><button class="sage__hoer" aria-label="Nochmal vorlesen">${hoerIcon}</button>
