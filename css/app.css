@@ -116,6 +116,23 @@ body.hochkant #app { visibility: hidden; }
   box-shadow: 0 3px 8px rgba(0,0,0,.4);
 }
 .rund:active { transform: scale(.93); }
+
+/* Vier feste Plaetze auf jedem Bildschirm. Wer immer am selben Ort sucht,
+   muss nicht lesen, wo etwas steht. */
+.knopf { position: absolute; z-index: 30; }
+.knopf--zurueck { left: 18px; bottom: 18px; }
+.knopf--notiz   { right: 18px; top: 16px; }
+.knopf--hoer    { right: 18px; bottom: 18px; background: rgba(245,239,225,.95); }
+/* Wenn ein Weiter-Knopf da ist, rueckt der Hoer-Knopf nach links daneben. */
+.scr:has(.weiterBtn) .knopf--hoer { right: 176px; }
+.fortschritt {
+  position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%);
+  display: flex; gap: 7px; z-index: 28;
+}
+.fortschritt .pip { box-shadow: 0 2px 6px rgba(0,0,0,.5); }
+/* Wo unten die Namensschilder stehen, gehoert der Fortschritt nach oben. */
+.scr--lineup .fortschritt, .scr--verhaftung .fortschritt,
+.scr--zeugen .fortschritt { top: 18px; bottom: auto; }
 .rund svg { width: 24px; height: 24px; }
 
 .stempel {
@@ -369,8 +386,9 @@ body.hochkant #app { visibility: hidden; }
   to { transform: translate(var(--dx), var(--dy)) scale(.25); opacity: 0 }
 }
 
+/* Unter dem Notizbuch-Knopf durch, nicht dahinter. */
 .beweisleiste {
-  position: absolute; right: 14px; top: 68px;
+  position: absolute; right: 14px; top: 80px;
   display: flex; flex-direction: column; gap: 8px; z-index: 20;
   background: rgba(14,20,28,.7); border-radius: 14px; padding: 10px;
   backdrop-filter: blur(6px); pointer-events: none;
@@ -395,21 +413,28 @@ body.hochkant #app { visibility: hidden; }
 
 /* ---------------- Labor ---------------- */
 
+/* Ohne Kopfleiste beginnt der Inhalt 40 Pixel weiter oben und darf hoeher
+   werden – die Probe war vorher unnoetig klein. */
 .laborProbe {
-  position: absolute; left: 34px; top: 96px; width: 250px; height: 320px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 8px; padding: 14px; border: 3px dashed var(--kante);
-  border-radius: 14px; background: rgba(233,224,204,.7);
+  position: absolute; left: 30px; top: 26px; width: 258px; height: 372px;
+  display: grid; place-items: center;
+  padding: 14px; border: 3px dashed var(--kante);
+  border-radius: 16px; background: rgba(233,224,204,.7);
 }
-.laborProbe svg { max-height: 232px; width: auto; max-width: 100%; }
-.laborProbe b { font-size: 15px; text-transform: uppercase; letter-spacing: .07em;
-  color: var(--ink-2); }
+/* Derselbe goldene Ring wie bei der Beweiskarte und der gesuchten Spur:
+   auf allen Bildschirmen heisst Gold «das hier suchst du». */
+.laborProbe::after {
+  content: ""; position: absolute; inset: -8px; border-radius: 20px;
+  border: 4px solid var(--messing); pointer-events: none;
+  animation: suchPuls 2.4s ease-in-out infinite;
+}
+.laborProbe svg { max-height: 336px; width: auto; max-width: 100%; }
 .karten {
-  position: absolute; right: 30px; top: 96px; width: 646px; height: 320px;
+  position: absolute; right: 26px; top: 26px; width: 650px; height: 372px;
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
 }
 .karten--3 { grid-template-columns: repeat(3, 1fr); }
-.karten--zahl { grid-template-columns: repeat(3, 1fr); align-content: center; height: auto; top: 180px; }
+.karten--zahl { grid-template-columns: repeat(3, 1fr); align-content: center; height: auto; top: 150px; }
 .karte {
   background: #fffdf6; border: 3px solid var(--kante); border-radius: 8px;
   padding: 10px; display: flex; flex-direction: column; align-items: center;
@@ -428,49 +453,94 @@ body.hochkant #app { visibility: hidden; }
 
 /* ---------------- Verfolgung ---------------- */
 
-.verfolgung { position: absolute; inset: 0; overflow: hidden; }
-.vfBoden { position: absolute; inset: 0; }
-.vfBoden img { width: 100%; height: 100%; object-fit: cover; filter: brightness(.66) saturate(.85); }
-.vfWeg {
-  position: absolute; left: 50%; bottom: -40px; transform: translateX(-50%);
-  width: 260px; height: 340px;
-  background: linear-gradient(180deg, transparent, rgba(226,208,168,.5) 30%, rgba(226,208,168,.75));
-  clip-path: polygon(38% 0, 62% 0, 100% 100%, 0 100%);
+/* ---------------- Verfolgung ---------------- */
+/* Die Szene fuellt den Bildschirm, die Spuren liegen im Weg, die Kamera
+   faehrt in den gewaehlten Ast. Keine Kopfleiste, kein Textkasten: der
+   Bildschirm gehoert der Szene, gesprochen wird ohnehin. */
+
+.scr--vf { background: #1b1f26; }
+.vf { position: absolute; inset: 0; overflow: hidden; }
+
+.vfKamera {
+  position: absolute; inset: 0; transform-origin: 50% 86%;
+  transition: transform 1.05s cubic-bezier(.32,.06,.24,1);
+  will-change: transform;
 }
-.vfRef {
-  position: absolute; left: 20px; top: 68px; width: 128px;
-  background: rgba(245,239,225,.95); border-radius: 12px; padding: 10px;
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
-  box-shadow: var(--schatten); z-index: 5;
+.vfKamera--nah { transform: scale(1.5) translate(0, 30px); }
+.vfSzene { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.vfSpuren { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+/* Die gewaehlte Faehrte zeichnet sich von vorne nach hinten. */
+.vfAst--gewaehlt { animation: spurZeichnen .85s ease-out both; }
+@keyframes spurZeichnen {
+  from { clip-path: inset(88% 0 0 0); }
+  to   { clip-path: inset(0 0 0 0); }
 }
-.vfRef svg { width: 100%; height: auto; display: block; border-radius: 6px; }
-.vfRef b { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-2); }
-.vfWahl { position: absolute; top: 84px; width: 224px; z-index: 6;
-  display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.vfWahl--links { left: 190px; }
-.vfWahl--rechts { right: 190px; }
-.vfPfeil {
-  width: 74px; height: 74px; border-radius: 50%; background: rgba(208,154,48,.95);
-  display: grid; place-items: center; box-shadow: 0 6px 16px rgba(0,0,0,.45);
-  animation: pfeilWipp 1.6s ease-in-out infinite;
+
+/* Lupe auf der Spur: gross genug zum Vergleichen, ohne den Weg zuzudecken. */
+.vfLupe {
+  position: absolute; width: 104px; height: 104px; padding: 0; border: 0;
+  background: none; border-radius: 50%; cursor: pointer;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 8px 18px rgba(0,0,0,.45));
+  transition: transform .25s ease, opacity .5s ease, filter .25s ease;
+  animation: lupePuls 2.6s ease-in-out infinite;
 }
-.vfPfeil svg { width: 38px; height: 38px; }
-@keyframes pfeilWipp { 50% { transform: translateY(-8px) } }
-.vfProbe {
-  width: 208px; background: rgba(245,239,225,.95); border-radius: 10px; padding: 8px;
-  box-shadow: 0 6px 18px rgba(0,0,0,.4); border: 3px solid transparent;
-  transition: border-color .2s;
+.vfLupe svg { display: block; width: 100%; height: 100%; }
+@keyframes lupePuls {
+  0%, 100% { transform: translate(-50%,-50%) scale(1); }
+  50%      { transform: translate(-50%,-50%) scale(1.045); }
 }
-.vfProbe svg { width: 100%; height: auto; display: block; border-radius: 6px; }
-.vfProbe--falsch { border-color: var(--rot); animation: wackeln .4s; }
-.vfProbe--richtig { border-color: var(--gut); }
-/* Schrittanzeige der Verfolgung – links unten, damit sie nicht mit den
-   Phasen-Pips in der Kopfleiste verwechselt wird. */
-.vfSchritte { position: absolute; left: 20px; bottom: 22px; display: flex; gap: 6px; z-index: 5; }
+.vfLupe--falsch { animation: wackeln .4s; }
+.vfLupe--falsch svg circle:last-of-type { stroke: var(--rot); }
+.vfLupe--richtig {
+  animation: lupeTreffer .5s cubic-bezier(.2,1.4,.4,1) both;
+}
+@keyframes lupeTreffer {
+  0%   { transform: translate(-50%,-50%) scale(1); }
+  55%  { transform: translate(-50%,-50%) scale(1.22); }
+  100% { transform: translate(-50%,-50%) scale(1.1); }
+}
+.vfLupe--weg { opacity: 0; pointer-events: none; transition: opacity .45s ease; }
+
+/* Die gesuchte Spur – oben links, ohne Beschriftung. Der gelbe Ring sagt
+   «das hier suchst du», das Bild sagt was. */
+.vfSuch {
+  position: absolute; left: 18px; top: 16px; width: 92px; height: 92px; z-index: 6;
+  filter: drop-shadow(0 6px 16px rgba(0,0,0,.5));
+}
+.vfSuch svg { display: block; width: 100%; height: 100%; }
+.vfSuch__ring {
+  position: absolute; inset: -7px; border-radius: 50%;
+  border: 4px solid var(--gold, #d09a30);
+  animation: suchPuls 2.4s ease-in-out infinite;
+}
+@keyframes suchPuls { 0%,100% { opacity: .95; transform: scale(1) } 50% { opacity: .5; transform: scale(1.06) } }
+
+.vfZurueck { position: absolute; left: 18px; bottom: 18px; z-index: 7; }
+.vfHoer {
+  position: absolute; right: 18px; bottom: 18px; z-index: 7;
+  background: rgba(245,239,225,.95);
+}
+.vfPips { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%);
+  display: flex; gap: 8px; z-index: 6; }
+.vfPips .pip { box-shadow: 0 2px 6px rgba(0,0,0,.5); }
+.vfStempel { position: absolute; left: 50%; top: 44%; transform: translate(-50%,-50%);
+  text-align: center; z-index: 6; }
 
 /* ---------------- Zeitstrahl ---------------- */
+/* Die Tatzeit stand als Untertitel in der Kopfleiste. Jetzt steht sie als
+   Zahlenpaar oben links – zwei Uhrzeiten braucht kein Kind vorgelesen. */
+.zsTatzeit {
+  position: absolute; left: 18px; top: 14px; z-index: 26;
+  background: rgba(245,239,225,.95); border-radius: 12px;
+  padding: 7px 14px; font-size: 21px; font-weight: 900; color: var(--ink);
+  box-shadow: 0 4px 12px rgba(0,0,0,.35);
+  display: flex; align-items: center; gap: 7px;
+}
+.zsTatzeit span { color: var(--ink-2); font-weight: 700; }
 
-.zsBox { position: absolute; left: 40px; right: 40px; top: 92px; height: 300px; }
+.zsBox { position: absolute; left: 40px; right: 40px; top: 66px; height: 332px; }
 .zsSkala { position: relative; height: 30px; margin-left: 150px; }
 .zsSkala span { position: absolute; top: 0; transform: translateX(-50%);
   font-size: 15px; font-weight: 800; color: #d8c9ab; text-shadow: 0 1px 4px rgba(0,0,0,.8); }
@@ -501,7 +571,9 @@ body.hochkant #app { visibility: hidden; }
 
 /* ---------------- Gegenüberstellung ---------------- */
 
-.lineup { position: absolute; left: 0; right: 0; bottom: 0; top: 66px; }
+/* Ohne Kopfleiste beginnt die Wand ganz oben – sonst blieb ein brauner
+   Streifen stehen, wo die Leiste war. */
+.lineup { position: absolute; inset: 0; }
 .wand {
   position: absolute; inset: 0;
   background:
@@ -517,7 +589,7 @@ body.hochkant #app { visibility: hidden; }
   display: flex; justify-content: center; align-items: flex-end; gap: 18px;
 }
 /* Mit Beweiskarte links braucht die Reihe dort Luft. */
-.scr--lineup .reihe { left: 240px; right: 14px; justify-content: space-evenly; gap: 6px; }
+.scr--lineup .reihe { left: 146px; right: 14px; justify-content: space-evenly; gap: 6px; }
 /* Ohne Merkmalschips sind die Karten flacher – die Reihe rueckt in die Mitte. */
 .scr--verhaftung .reihe { bottom: 74px; }
 .person {
@@ -585,32 +657,25 @@ body.hochkant #app { visibility: hidden; }
 
 /* Die Frage steht in der Beweiskarte, nicht unten: sonst verdeckt sie
    genau die Merkmale, die verglichen werden sollen. */
+/* Der Beweis vom Tatort: oben links, rund, ohne Beschriftung. Der goldene
+   Ring sagt «das hier suchst du», das Bild sagt was. Dieselbe Sprache wie die
+   gesuchte Spur in der Verfolgung – ein Ort, ein Zeichen, keine Woerter. */
 .beweiskarte {
-  position: absolute; left: 24px; top: 74px; width: 208px;
-  background: rgba(245,239,225,.97); border-radius: 12px; padding: 12px;
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
-  box-shadow: var(--schatten); z-index: 8;
+  position: absolute; left: 20px; top: 16px; width: 104px; height: 104px; z-index: 26;
+  filter: drop-shadow(0 6px 16px rgba(0,0,0,.5));
   animation: karteFliegt .5s cubic-bezier(.2,1.25,.4,1) both;
 }
 @keyframes karteFliegt { from { opacity: 0; transform: translateX(-120px) rotate(-10deg) } }
-.beweiskarte svg { width: 44px; height: 44px; }
-/* Die Beweiskarte zeigt dasselbe Bild wie die Tafeln über den Köpfen –
-   sonst vergleicht das Kind zwei verschiedene Zeichensprachen. */
-.beweiskarte__bild { width: 76px; height: 76px; display: block; border-radius: 12px;
-  overflow: hidden; border: 3px solid rgba(255,253,246,.95);
-  box-shadow: 0 4px 12px rgba(0,0,0,.22); }
-.beweiskarte__bild svg { width: 100%; height: 100%; }
-.beweiskarte b { font-size: 26px; font-weight: 900; }
-.beweiskarte small { font-size: 13px; text-transform: uppercase; letter-spacing: .07em;
-  color: var(--ink-2); }
-.beweisFrage {
-  display: flex; align-items: center; gap: 9px; margin-top: 4px;
-  border-top: 2px solid var(--papier-3); padding-top: 9px; width: 100%;
-  font-size: 17px; font-weight: 700; line-height: 1.25; text-align: left;
+.beweiskarte__bild {
+  position: absolute; inset: 0; border-radius: 50%; overflow: hidden;
+  border: 4px solid rgba(255,253,246,.96); background: var(--papier);
 }
-.beweisFrage .sage__hoer { background: rgba(0,0,0,.08); flex: 0 0 28px;
-  width: 28px; height: 28px; }
-.beweisFrage .sage__hoer svg { width: 17px; height: 17px; }
+.beweiskarte__bild svg { width: 100%; height: 100%; display: block; }
+.beweiskarte__ring {
+  position: absolute; inset: -7px; border-radius: 50%;
+  border: 4px solid var(--messing);
+  animation: suchPuls 2.4s ease-in-out infinite;
+}
 
 .blaulicht {
   position: absolute; inset: 0; pointer-events: none; z-index: 30; opacity: 0;
