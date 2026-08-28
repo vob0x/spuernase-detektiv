@@ -56,6 +56,10 @@ am Ende flutet Blaulicht den Raum.
 - **Prüfung:** jede frische Aufnahme wird sofort von einem Spracherkenner
   abgehört. Spricht das Modell die Regieanweisung mit oder nuschelt es, wird die
   Zeile wiederholt und der **beste** Versuch behalten
+- **Wiedergabe:** Zeilen reihen sich an, statt einander abzuschneiden
+  (`js/voice.js`). Anleitungen weichen, sobald das Kind handelt; kurze
+  Rückmeldungen überleben den Bildschirmwechsel; Fehlermeldungen unterbrechen
+  sofort — mit 120 ms Ausblendung, damit es nicht knackt
 - **Ton:** Effekte, Kulissen und Musik vollständig über die WebAudio-API
   synthetisiert. Die Klangbetten der Kulissen (`js/kulisse.js`) werden als
   Sample mit tausenden Einzelereignissen ausgerechnet — Regen besteht aus
@@ -98,6 +102,7 @@ node tools/serve.js .        # http://localhost:8099
 node tools/test.js           # spielt alle fünf Fälle automatisch durch
 node tools/audiotest.js      # misst jeden Klang, die Kulissen und den Stummschalter
 python3 tools/regietest.py        # prüft Regie, Besetzung und Schreibregeln
+node tools/stimmtest.js           # prüft, dass keine Zeile eine andere abschneidet
 python3 tools/hoerprobe.py        # hört jede Aufnahme ab und vergleicht mit dem Text
 python3 tools/lebendigkeit.py     # misst Sprechmelodie und Abwechslung
 ```
