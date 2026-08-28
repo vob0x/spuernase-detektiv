@@ -520,3 +520,88 @@ dauert länger, weil es vorher Text weggeworfen hat. Ein Kind spielt ohnehin
 langsamer als der Testklick, aber an den Übergängen wartet es jetzt auf das
 Satzende. Der «Weiter»-Knopf erscheint sofort und beendet die Schlange, wer
 mag, klickt weiter. Ob das reicht, sagt kein Messwert.
+
+## Runde 9 – Bedienung auf der Szene statt Kopfleiste darüber
+
+**Auftrag.** Die Fälle wirken statisch; Vorbild ist die Lern-App **EDURINO**
+(4–8 Jahre, mit Stift und Figuren). «Prüfe und beurteile: Könnten
+Videosequenzen oder animierte Grafiken einen Mehrwert bringen?» – danach:
+«nachziehen».
+
+### Zwei meiner vier Einwände gegen Video sind gefallen
+
+Ich hatte behauptet, Video sei hier nicht herstellbar und zu gross. Beides
+war falsch, und beides habe ich gemessen statt geschätzt:
+
+| | Ergebnis |
+|---|---|
+| Bild aus Text, mit vorhandenem Artwork als Stilvorlage | Stil trifft, **40–57 KB** je Szene, ~60 s |
+| Veo 3.1 aus Text | Stil daneben (gerenderte 3D-Alpenszene), **Reifenspur im Kies unlesbar** |
+| Veo 3.1 mit erzeugtem Standbild als erstem Vollbild | **Stil hält**, 74 KB je Sekunde |
+
+Der erste Veo-Versuch ist der Beleg für den einzigen Einwand, der steht:
+**für Beweismittel taugt Video nicht.** Was das Kind vergleichen soll, war im
+Film nicht zu sehen. Die Spuren bleiben deshalb prozedurales SVG; erzeugt
+werden nur die **Szenen**, in denen sie liegen.
+
+### Was von EDURINO übernommen ist
+
+Aus den App-Store-Screenshots abgelesen, nicht aus Rezensionen: die Szene
+füllt den Bildschirm, es gibt keine Kopfleiste und keinen Titel, Aufgaben
+liegen **in** der Welt, Anweisungen werden gesprochen statt geschrieben, und
+es bleiben ein paar wenige runde Knöpfe.
+
+Übernommen ist die **Interaktion**, nicht die Farbwelt. EDURINO ist knallblau
+und rund – richtig für Vierjährige. Spürnase ist für Achtjährige und ein
+Detektivspiel; das papierne, gedeckte Aussehen trägt das Thema, und
+Achtjährige merken, wenn eine App sie für kleiner hält, als sie sind.
+
+### Vier feste Plätze
+
+Die braune Holzleiste nahm oben 60 Pixel und erklärte in Worten, was das Bild
+zeigt («Tatort – Bahnhof Bärenmoos»). Ersetzt durch vier Plätze, auf allen
+Bildschirmen gleich: oben links was gesucht wird, oben rechts das Notizbuch,
+unten links zurück, unten Mitte der Fortschritt, unten rechts nochmal hören.
+Wer immer am selben Ort sucht, muss nicht lesen, wo etwas steht.
+
+Der goldene, pulsende Ring heisst überall dasselbe: **das hier suchst du.**
+Er sitzt auf der Laborprobe, auf der Beweiskarte der Gegenüberstellung und
+auf der gesuchten Spur in der Verfolgung.
+
+### Der Text ist nicht einfach weg
+
+Der gesprochene Satz steht weiterhin geschrieben da – aber **nur, wenn er
+nicht gesprochen werden kann**, also bei Ton aus oder Vorlesen aus. Sonst
+wäre das Spiel ohne Ton unspielbar, und das wäre ein zu hoher Preis für einen
+aufgeräumten Bildschirm.
+
+Weggefallen sind dagegen die Beschriftungen, die das Bild ohnehin sagt: die
+Buchstaben A–D auf den Laborkarten, «Wirbel» und «Vom Tatort» auf der
+Beweiskarte. Bei Zahlenaufgaben bleibt die Zahl – dort **ist** sie der Inhalt.
+
+### Die Verfolgung
+
+Sie war ein Quiz mit Tapete: zwei Karten vor einem abgedunkelten Foto, dazu
+Kopfleiste und Textkasten. Gemessen ragten die Karten **28 Pixel unter die
+Bühne** – das untere Drittel des Reifenprofils war gar nicht zu sehen.
+
+Jetzt liegen die Spuren im Weg und laufen perspektivisch nach hinten; nach
+der richtigen Wahl fährt die Kamera in den gewählten Ast. Der Drehpunkt sitzt
+auf dem Ende der gewählten Fährte – dann bleibt genau dieser Punkt stehen und
+alles andere wächst um ihn herum. Aus drei Fragen wird ein Weg.
+
+Beim ersten Anlauf fuhr die Kamera in die falsche Richtung: ich hatte die
+Szene verschoben statt den Blick. Im Screenshot sofort zu sehen, im Code
+nicht.
+
+### Nebenwirkung, die der Test gefunden hat
+
+Nach dem Umbau warf die Spurensuche `Cannot read properties of null` – der
+Code schrieb den Spurentext in einen Kasten, den es ohne Ton gar nicht mehr
+gibt. Vier Fälle brachen ab. Ohne den Spieltest wäre das erst dem Kind
+aufgefallen.
+
+### Ergebnis
+
+Alle fünf Fälle 3/3 Sterne, keine JS-Fehler, Ton und Sprachreihenfolge
+unverändert sauber. Zwei neue Bilddateien, zusammen 94 KB.
